@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  devices      Device[]
+  ringtones    Ringtone[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Device {
+  id                String        @id @default(uuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id])
+  name              String
+  platform          String        @default("ANDROID")
+  fcmToken          String?
+  defaultRingtoneId String?
+  lastSeenAt         DateTime?
+  commands          RingCommand[]
+  schedules          RingSchedule[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model RingCommand {
+  id              String   @id @default(uuid())
+  userId          String
+  deviceId        String
+  device          Device   @relation(fields: [deviceId], references: [id])
+  type            String   // RING_START or RING_STOP
+  status          String   // CREATED, SENT, FAILED
+  durationSeconds Int?
+  ringtoneId      String?
+  createdAt       DateTime @default(now())
+}
+
+model RingSchedule {
+  id              String   @id @default(uuid())
+  deviceId        String
+  device          Device   @relation(fields: [deviceId], references: [id])
+  startAt         DateTime
+  durationSeconds Int
+  ringtoneId      String?
+  recurrenceRule  String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Ringtone {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  fileUrl   String
+  mimeType  String
+  sizeBytes Int
+  createdAt DateTime @default(now())
+}
