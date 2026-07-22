@@ -1,14 +1,20 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaModule } from './prisma/prisma.module';
-import { AuthModule } from './auth/auth.module';
 import { DevicesModule } from './devices/devices.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { RingCommandsModule } from './ring-commands/ring-commands.module';
-import { FirebaseModule } from './firebase/firebase.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, DevicesModule, RingCommandsModule, FirebaseModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    PrismaModule,
+    DevicesModule,
+    RingCommandsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
