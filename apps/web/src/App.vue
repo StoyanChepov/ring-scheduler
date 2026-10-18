@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
+import AuthForm from './components/AuthForm.vue';
+import { useAuth } from './composables/useAuth';
 import { api } from './services/api';
 
 type Device = {
@@ -10,6 +12,8 @@ type Device = {
   lastSeenAt?: string | null;
   createdAt: string;
 };
+
+const { user, isLoggedIn, isRestoring, restoreSession, logout } = useAuth();
 
 const devices = ref<Device[]>([]);
 const newDeviceName = ref('Mock Android Phone');
@@ -94,7 +98,18 @@ async function stopDevice(device: Device) {
   }
 }
 
-onMounted(loadDevices);
+// Load the user's devices on login; drop them on logout so the next person
+// to log in on this browser never sees stale data.
+watch(isLoggedIn, (loggedIn) => {
+  if (loggedIn) {
+    loadDevices();
+  } else {
+    devices.value = [];
+    message.value = '';
+  }
+});
+
+onMounted(restoreSession);
 </script>
 
 <template>
@@ -105,6 +120,16 @@ onMounted(loadDevices);
       <p class="subtitle">
         Create mock devices, send ring commands, and stop them from the web UI.
       </p>
+    </section>
+
+    <p v-if="isRestoring" class="muted session-note">Restoring your session...</p>
+
+    <AuthForm v-else-if="!isLoggedIn" />
+
+    <template v-else>
+    <section class="card user-bar">
+      <span>Signed in as <strong>{{ user?.email }}</strong></span>
+      <button class="secondary" @click="logout">Log out</button>
     </section>
 
     <section class="card">
@@ -176,6 +201,7 @@ onMounted(loadDevices);
         </li>
       </ul>
     </section>
+    </template>
   </main>
 </template>
 
@@ -220,6 +246,18 @@ h1 {
   border: 1px solid #e1e6ef;
   border-radius: 18px;
   box-shadow: 0 12px 30px rgba(23, 32, 51, 0.06);
+}
+
+.session-note {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.user-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .section-header,

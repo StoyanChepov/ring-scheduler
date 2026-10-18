@@ -2,27 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RingDeviceDto } from './dto/ring-device.dto';
 
-const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
-
 @Injectable()
 export class RingCommandsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async ringDevice(deviceId: string, dto: RingDeviceDto) {
-    const device = await this.prisma.device.findFirst({
-      where: {
-        id: deviceId,
-        userId: DEV_USER_ID,
-      },
-    });
-
-    if (!device) {
-      throw new NotFoundException('Device not found');
-    }
+  async ringDevice(userId: string, deviceId: string, dto: RingDeviceDto) {
+    const device = await this.findOwnedDevice(userId, deviceId);
 
     const command = await this.prisma.ringCommand.create({
       data: {
-        userId: DEV_USER_ID,
+        userId,
         deviceId,
         type: 'RING_START',
         status: 'CREATED',
@@ -43,21 +32,12 @@ export class RingCommandsService {
     };
   }
 
-  async stopDevice(deviceId: string) {
-    const device = await this.prisma.device.findFirst({
-      where: {
-        id: deviceId,
-        userId: DEV_USER_ID,
-      },
-    });
-
-    if (!device) {
-      throw new NotFoundException('Device not found');
-    }
+  async stopDevice(userId: string, deviceId: string) {
+    const device = await this.findOwnedDevice(userId, deviceId);
 
     const command = await this.prisma.ringCommand.create({
       data: {
-        userId: DEV_USER_ID,
+        userId,
         deviceId,
         type: 'RING_STOP',
         status: 'CREATED',
@@ -73,5 +53,19 @@ export class RingCommandsService {
         message: `Mock stop command sent to ${device.name}`,
       },
     };
+  }
+
+  // Someone else's device and a missing device both give 404, so device IDs
+  // can't be probed.
+  private async findOwnedDevice(userId: string, deviceId: string) {
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, userId },
+    });
+
+    if (!device) {
+      throw new NotFoundException('Device not found');
+    }
+
+    return device;
   }
 }
