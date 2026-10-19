@@ -1,0 +1,2 @@
+# Makes apps/web its own pnpm project, so installing here (as Vercel does
+# with Root Directory apps/web) does not resolve to the repo root.
