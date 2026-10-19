@@ -30,6 +30,14 @@ export class DevicesController {
     return this.devicesService.create(user.id, dto);
   }
 
+  @Post(':deviceId/key')
+  issueKey(
+    @CurrentUser() user: AuthUser,
+    @Param('deviceId', ParseUUIDPipe) deviceId: string,
+  ) {
+    return this.devicesService.issueKey(user.id, deviceId);
+  }
+
   @Patch(':deviceId/token')
   updateToken(
     @CurrentUser() user: AuthUser,

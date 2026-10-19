@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument --
+   jest.fn() mock calls are untyped by nature. */
 import { ConfigService } from '@nestjs/config';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -33,7 +35,9 @@ describe('FirebaseService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(getApps).mockReturnValue([]);
-    jest.mocked(initializeApp).mockReturnValue({ name: 'ring-scheduler' } as never);
+    jest
+      .mocked(initializeApp)
+      .mockReturnValue({ name: 'ring-scheduler' } as never);
     jest.mocked(getMessaging).mockReturnValue({ send } as never);
   });
 
@@ -47,7 +51,10 @@ describe('FirebaseService', () => {
       expect(initializeApp).not.toHaveBeenCalled();
 
       await expect(
-        service.sendRingCommand('token', { commandId: 'c1', type: 'RING_START' }),
+        service.sendRingCommand('token', {
+          commandId: 'c1',
+          type: 'RING_START',
+        }),
       ).resolves.toMatchObject({ status: 'failed', invalidToken: false });
       expect(send).not.toHaveBeenCalled();
     });
@@ -60,7 +67,10 @@ describe('FirebaseService', () => {
       service.onModuleInit();
 
       expect(service.isEnabled).toBe(true);
-      expect(initializeApp).toHaveBeenCalledWith(expect.anything(), 'ring-scheduler');
+      expect(initializeApp).toHaveBeenCalledWith(
+        expect.anything(),
+        'ring-scheduler',
+      );
     });
 
     it('initialises from a key file path', () => {
@@ -152,9 +162,9 @@ describe('FirebaseService', () => {
         commandId: 'cmd-1',
         durationSeconds: '45',
       });
-      expect(Object.values(message.data).every((v) => typeof v === 'string')).toBe(
-        true,
-      );
+      expect(
+        Object.values(message.data).every((v) => typeof v === 'string'),
+      ).toBe(true);
       expect(message.android).toMatchObject({
         priority: 'high',
         ttl: 60_000,
@@ -203,6 +213,58 @@ describe('FirebaseService', () => {
       await expect(
         service.sendRingCommand('t', { commandId: 'c', type: 'RING_START' }),
       ).resolves.toMatchObject({ status: 'failed', invalidToken: false });
+    });
+  });
+
+  describe('sendSchedulesChanged', () => {
+    it('sends a data-only nudge that collapses and outlives a ring command', async () => {
+      const service = createService({
+        FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify(ACCOUNT),
+      });
+      service.onModuleInit();
+      send.mockResolvedValue('projects/demo/messages/2');
+
+      await expect(
+        service.sendSchedulesChanged('device-token'),
+      ).resolves.toEqual({
+        status: 'sent',
+        messageId: 'projects/demo/messages/2',
+      });
+
+      const message = send.mock.calls[0][0];
+      expect(message.token).toBe('device-token');
+      expect(message.notification).toBeUndefined();
+      expect(message.data.type).toBe('SCHEDULES_CHANGED');
+      expect(message.android).toMatchObject({
+        priority: 'high',
+        collapseKey: 'schedules-changed',
+      });
+      expect(message.android.ttl).toBeGreaterThan(60_000);
+    });
+
+    it('reports a dead token like a ring command does', async () => {
+      const service = createService({
+        FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify(ACCOUNT),
+      });
+      service.onModuleInit();
+      send.mockRejectedValue({
+        code: 'messaging/registration-token-not-registered',
+      });
+
+      await expect(service.sendSchedulesChanged('t')).resolves.toMatchObject({
+        status: 'failed',
+        invalidToken: true,
+      });
+    });
+
+    it('fails without calling FCM when push is not configured', async () => {
+      const service = createService({});
+      service.onModuleInit();
+
+      await expect(service.sendSchedulesChanged('t')).resolves.toMatchObject({
+        status: 'failed',
+      });
+      expect(send).not.toHaveBeenCalled();
     });
   });
 

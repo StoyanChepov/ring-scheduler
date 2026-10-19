@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { DevicesModule } from './devices/devices.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RingCommandsModule } from './ring-commands/ring-commands.module';
+import { SchedulesModule } from './schedules/schedules.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { RingCommandsModule } from './ring-commands/ring-commands.module';
     AuthModule,
     DevicesModule,
     RingCommandsModule,
+    SchedulesModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
