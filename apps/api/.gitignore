@@ -60,3 +60,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Firebase / Google service account keys
 *-firebase-adminsdk-*.json
 service-account*.json
+
+# Vercel CLI
+.vercel
