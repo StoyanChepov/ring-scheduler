@@ -20,6 +20,8 @@ import android.widget.TextView
 import android.widget.Toast
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.messaging.FirebaseMessaging
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
@@ -76,11 +78,13 @@ class MainActivity : Activity() {
         }
         findViewById<Button>(R.id.logoutButton).setOnClickListener {
             session.logout()
+            // A disconnected phone must not keep ringing on old schedules.
+            AlarmScheduler.clear(this)
             render("Logged out.")
         }
 
         requestNotificationPermission()
-        render(if (session.isLoggedIn) "Connected as ${session.email}" else "Log in to connect this phone.")
+        render(if (session.isLoggedIn) connectedMessage() else "Log in to connect this phone.")
         syncToken()
     }
 
@@ -114,12 +118,15 @@ class MainActivity : Activity() {
                 val auth = if (register) api.register(emailText, passwordText) else api.login(emailText, passwordText)
                 val authed = ApiClient(url, auth.accessToken)
 
-                // Reuse this phone's device record when the same account logs back in.
+                // Reuse this phone's device record when the same account logs back
+                // in: it gets a fresh key (revoking the old one) and the current
+                // push token.
                 val existingDevice = session.deviceId.takeIf { session.email == auth.email }
-                val deviceId = existingDevice?.let { id ->
+                val credentials = existingDevice?.let { id ->
                     try {
-                        authed.updateToken(id, token)
-                        id
+                        val key = authed.issueDeviceKey(id)
+                        ApiClient(url, key).updateOwnToken(token)
+                        ApiClient.DeviceCredentials(id, key)
                     } catch (e: ApiException) {
                         // Deleted on the server: fall through and create a new one.
                         if (e.status != 404) throw e
@@ -127,15 +134,15 @@ class MainActivity : Activity() {
                     }
                 } ?: authed.createDevice(name, token)
 
+                // The user's login token is not kept: from here on the phone
+                // authenticates as itself, with the device key.
                 session.serverUrl = url
                 session.email = auth.email
-                session.accessToken = auth.accessToken
-                session.deviceId = deviceId
+                session.deviceId = credentials.deviceId
+                session.deviceKey = credentials.deviceKey
 
-                runOnUiThread {
-                    password.text.clear()
-                    render("Connected as ${auth.email}")
-                }
+                runOnUiThread { password.text.clear() }
+                syncSchedules()
             } catch (e: Exception) {
                 Log.w(TAG, "Login failed", e)
                 runOnUiThread { render("Failed: ${describe(e)}") }
@@ -148,17 +155,19 @@ class MainActivity : Activity() {
         background.execute {
             try {
                 val token = currentFcmToken()
-                val accessToken = session.accessToken
-                val deviceId = session.deviceId
+                val deviceKey = session.deviceKey
 
-                if (accessToken != null && deviceId != null) {
-                    ApiClient(session.serverUrl, accessToken).updateToken(deviceId, token)
+                if (deviceKey != null) {
+                    ApiClient(session.serverUrl, deviceKey).updateOwnToken(token)
+                    syncSchedules()
                 }
             } catch (e: ApiException) {
                 if (e.status == 401) {
-                    // Login tokens expire; ask for the password again.
+                    // The key was replaced (logged in on another install) or the
+                    // device was deleted; ask for the password again.
                     session.logout()
-                    runOnUiThread { render("Your login expired. Log in again.") }
+                    AlarmScheduler.clear(this)
+                    runOnUiThread { render("This phone was disconnected. Log in again.") }
                 } else {
                     runOnUiThread { render("Could not reach the server: ${describe(e)}") }
                 }
@@ -187,6 +196,38 @@ class MainActivity : Activity() {
         getSystemService(ClipboardManager::class.java)
             .setPrimaryClip(ClipData.newPlainText("FCM token", token))
         Toast.makeText(this, "Push token copied", Toast.LENGTH_SHORT).show()
+    }
+
+    // On the background thread. A failed sync keeps the alarms already set.
+    private fun syncSchedules() {
+        val message = try {
+            AlarmScheduler.sync(this)
+            connectedMessage()
+        } catch (e: Exception) {
+            Log.w(TAG, "Schedule sync failed", e)
+            "${connectedMessage()}\n(Could not refresh schedules: ${describe(e)})"
+        }
+        runOnUiThread { render(message) }
+    }
+
+    private fun connectedMessage(): String {
+        val lines = mutableListOf("Connected as ${session.email}")
+
+        if (!AlarmScheduler.canSetExactAlarms(this)) {
+            lines += "Alarms are blocked: allow \"Alarms & reminders\" for this app in Settings."
+        }
+
+        val next = AlarmScheduler.nextAlarm(this)
+        lines += if (next == null) {
+            "No alarms scheduled."
+        } else {
+            val (schedule, at) = next
+            val whenText = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm")
+                .format(at.atZone(ZoneId.systemDefault()))
+            "Next alarm: $whenText" + (schedule.label?.let { " ($it)" } ?: "")
+        }
+
+        return lines.joinToString("\n")
     }
 
     private fun render(message: String) {

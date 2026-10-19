@@ -1,5 +1,6 @@
 package com.ringscheduler.app
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -8,28 +9,45 @@ class ApiException(val status: Int, message: String) : Exception(message)
 
 /**
  * Blocking calls to the ring-scheduler API. Call from a background thread.
+ *
+ * [bearer] is the user's login token for the account calls, or the phone's
+ * device key (`dk_...`) for the `/device` calls.
  */
-class ApiClient(private val baseUrl: String, private val accessToken: String? = null) {
+class ApiClient(private val baseUrl: String, private val bearer: String? = null) {
 
     data class AuthResult(val accessToken: String, val email: String)
+
+    data class DeviceCredentials(val deviceId: String, val deviceKey: String)
 
     fun login(email: String, password: String) = auth("login", email, password)
 
     fun register(email: String, password: String) = auth("register", email, password)
 
-    /** Returns the new device's ID. */
-    fun createDevice(name: String, fcmToken: String): String {
+    // --- With the user's login -------------------------------------------
+
+    fun createDevice(name: String, fcmToken: String): DeviceCredentials {
         val body = JSONObject()
             .put("name", name)
             .put("platform", "ANDROID")
             .put("fcmToken", fcmToken)
 
-        return request("POST", "/devices", body).getString("id")
+        val device = request("POST", "/devices", body)
+        return DeviceCredentials(device.getString("id"), device.getString("deviceKey"))
     }
 
-    fun updateToken(deviceId: String, fcmToken: String) {
-        request("PATCH", "/devices/$deviceId/token", JSONObject().put("fcmToken", fcmToken))
+    /** A fresh key for an existing device; the old one stops working. */
+    fun issueDeviceKey(deviceId: String): String =
+        request("POST", "/devices/$deviceId/key", JSONObject()).getString("deviceKey")
+
+    // --- With the device key ---------------------------------------------
+
+    fun updateOwnToken(fcmToken: String) {
+        request("PATCH", "/device/token", JSONObject().put("fcmToken", fcmToken))
     }
+
+    /** The active schedules this phone should set alarms for. */
+    fun fetchSchedules(): List<Schedule> =
+        Schedule.listFromJson(JSONArray(send("GET", "/device/schedules")))
 
     private fun auth(path: String, email: String, password: String): AuthResult {
         val body = JSONObject().put("email", email).put("password", password)
@@ -41,7 +59,13 @@ class ApiClient(private val baseUrl: String, private val accessToken: String? = 
         )
     }
 
-    private fun request(method: String, path: String, body: JSONObject): JSONObject {
+    private fun request(method: String, path: String, body: JSONObject? = null): JSONObject {
+        val text = send(method, path, body)
+        return if (text.isBlank()) JSONObject() else JSONObject(text)
+    }
+
+    /** Returns the response body; throws ApiException for a non-2xx status. */
+    private fun send(method: String, path: String, body: JSONObject? = null): String {
         val connection = URL(baseUrl + path).openConnection() as HttpURLConnection
 
         try {
@@ -49,11 +73,13 @@ class ApiClient(private val baseUrl: String, private val accessToken: String? = 
             connection.requestMethod = method
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            accessToken?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
+            bearer?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
 
-            connection.outputStream.use { it.write(body.toString().toByteArray()) }
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.outputStream.use { it.write(body.toString().toByteArray()) }
+            }
 
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
@@ -63,7 +89,7 @@ class ApiClient(private val baseUrl: String, private val accessToken: String? = 
                 throw ApiException(status, errorMessage(status, text))
             }
 
-            return if (text.isBlank()) JSONObject() else JSONObject(text)
+            return text
         } finally {
             connection.disconnect()
         }
