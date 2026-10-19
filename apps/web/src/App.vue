@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import AuthForm from './components/AuthForm.vue';
+import DeviceSchedules from './components/DeviceSchedules.vue';
 import { useAuth } from './composables/useAuth';
 import { api } from './services/api';
 
@@ -135,7 +136,7 @@ onMounted(restoreSession);
       <p class="eyebrow">RingScheduler</p>
       <h1>Remote device ringing dashboard</h1>
       <p class="subtitle">
-        Create mock devices, send ring commands, and stop them from the web UI.
+        Ring your devices now, or schedule alarms that ring even when the phone is offline.
       </p>
     </section>
 
@@ -215,6 +216,8 @@ onMounted(restoreSession);
               Stop
             </button>
           </div>
+
+          <DeviceSchedules :device-id="device.id" :is-phone="device.platform === 'ANDROID'" />
         </li>
       </ul>
     </section>
@@ -360,6 +363,7 @@ button.danger {
 }
 
 .device-card {
+  flex-wrap: wrap;
   padding: 16px;
   border: 1px solid #e1e6ef;
   border-radius: 14px;
