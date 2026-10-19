@@ -15,6 +15,7 @@ class RingMessagingService : FirebaseMessagingService() {
             when (data["type"]) {
                 "RING_START" -> RingService.start(this, data["durationSeconds"]?.toIntOrNull())
                 "RING_STOP" -> RingService.stop(this)
+                "SCHEDULES_CHANGED" -> syncSchedules()
                 else -> Log.w(TAG, "Ignoring unknown message type ${data["type"]}")
             }
         } catch (e: IllegalStateException) {
@@ -26,21 +27,28 @@ class RingMessagingService : FirebaseMessagingService() {
         }
     }
 
+    // onMessageReceived runs on a background thread, so the network call is fine.
+    private fun syncSchedules() {
+        try {
+            AlarmScheduler.sync(this)
+        } catch (e: Exception) {
+            // The cached alarms stay set; the app syncs again when it opens.
+            Log.w(TAG, "Could not sync schedules", e)
+        }
+    }
+
     // Deprecated in firebase-messaging 26 (see the TODO in MainActivity).
     @Deprecated("Replaced by onRegistered in firebase-messaging 26")
     override fun onNewToken(token: String) {
         Log.i(TAG, "New FCM token: $token")
 
         val session = Session(this)
-        val accessToken = session.accessToken
-        val deviceId = session.deviceId
+        val deviceKey = session.deviceKey ?: return
 
-        if (accessToken == null || deviceId == null) return
-
-        // Already on a background thread. If this fails (e.g. the login token
-        // expired), MainActivity sends the current token next time it opens.
+        // Already on a background thread. If this fails (e.g. no network),
+        // MainActivity sends the current token next time it opens.
         try {
-            ApiClient(session.serverUrl, accessToken).updateToken(deviceId, token)
+            ApiClient(session.serverUrl, deviceKey).updateOwnToken(token)
         } catch (e: Exception) {
             Log.w(TAG, "Could not upload new FCM token", e)
         }

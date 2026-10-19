@@ -11,6 +11,10 @@ const APP_NAME = 'ring-scheduler';
 // the message expires quickly instead of ringing a phone minutes later.
 const COMMAND_TTL_MS = 60_000;
 
+// A schedule change is still worth delivering hours later: the phone needs it
+// before the next alarm, whenever it comes back online.
+const SCHEDULES_TTL_MS = 24 * 60 * 60 * 1000;
+
 // Both codes mean FCM will never accept this token again. Other errors
 // (including mismatched-credential, which is a server config problem) must not
 // cause the stored token to be thrown away.
@@ -164,17 +168,54 @@ export class FirebaseService implements OnModuleInit {
       data.durationSeconds = String(payload.durationSeconds);
     }
 
+    return this.send(
+      token,
+      data,
+      {
+        ttl: COMMAND_TTL_MS,
+        // If the phone is offline, a stop replaces a still-queued ring
+        // instead of both being delivered in order.
+        collapseKey: 'ring-command',
+      },
+      `command ${payload.commandId}`,
+    );
+  }
+
+  /**
+   * Tells the phone its schedules changed, so it fetches them and resets its
+   * alarms. The message carries no schedule data; the phone asks the API.
+   */
+  async sendSchedulesChanged(token: string): Promise<PushOutcome> {
+    if (!this.app) {
+      return {
+        status: 'failed',
+        reason: 'Push delivery is not configured on the server',
+        invalidToken: false,
+      };
+    }
+
+    return this.send(
+      token,
+      { type: 'SCHEDULES_CHANGED', sentAt: new Date().toISOString() },
+      // Several quick edits only need one sync.
+      { ttl: SCHEDULES_TTL_MS, collapseKey: 'schedules-changed' },
+      'schedules update',
+    );
+  }
+
+  // FCM failures are returned as an outcome instead of thrown, so callers can
+  // record the result either way.
+  private async send(
+    token: string,
+    data: Record<string, string>,
+    android: { ttl: number; collapseKey: string },
+    description: string,
+  ): Promise<PushOutcome> {
     try {
       const messageId = await getMessaging(this.app).send({
         token,
         data,
-        android: {
-          priority: 'high',
-          ttl: COMMAND_TTL_MS,
-          // If the phone is offline, a stop replaces a still-queued ring
-          // instead of both being delivered in order.
-          collapseKey: 'ring-command',
-        },
+        android: { priority: 'high', ...android },
       });
 
       return { status: 'sent', messageId };
@@ -182,9 +223,7 @@ export class FirebaseService implements OnModuleInit {
       const code = (error as { code?: string }).code ?? 'unknown';
       const invalidToken = DEAD_TOKEN_CODES.has(code);
 
-      this.logger.warn(
-        `FCM send failed for command ${payload.commandId}: ${code}`,
-      );
+      this.logger.warn(`FCM send failed for ${description}: ${code}`);
 
       return {
         status: 'failed',
@@ -196,7 +235,9 @@ export class FirebaseService implements OnModuleInit {
     }
   }
 
-  private loadServiceAccount(): (ServiceAccount & { projectId: string }) | null {
+  private loadServiceAccount():
+    | (ServiceAccount & { projectId: string })
+    | null {
     const inline = this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_JSON');
     const path = this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_PATH');
 
@@ -209,10 +250,9 @@ export class FirebaseService implements OnModuleInit {
     let raw: Record<string, unknown>;
 
     try {
-      raw = JSON.parse(inline ?? readFileSync(path as string, 'utf8')) as Record<
-        string,
-        unknown
-      >;
+      raw = JSON.parse(
+        inline ?? readFileSync(path as string, 'utf8'),
+      ) as Record<string, unknown>;
     } catch {
       throw new Error(
         'Firebase service account could not be read: ' +

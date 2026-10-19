@@ -30,6 +30,9 @@ model Device {
   name              String
   platform          String        @default("ANDROID")
   fcmToken          String?
+  // SHA-256 of the device key the phone authenticates with; the key itself is
+  // only ever shown once, when it is issued.
+  keyHash           String?       @unique
   defaultRingtoneId String?
   lastSeenAt         DateTime?
   commands          RingCommand[]
@@ -51,16 +54,23 @@ model RingCommand {
 }
 
 model RingSchedule {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   deviceId        String
-  device          Device   @relation(fields: [deviceId], references: [id])
-  startAt         DateTime
+  device          Device    @relation(fields: [deviceId], references: [id])
+  label           String?
+  // ONE_TIME rings once at startAt. WEEKLY rings at timeOfDay ("HH:mm") on
+  // daysOfWeek (1 = Monday ... 7 = Sunday), in the phone's local time zone.
+  kind            String
+  startAt         DateTime?
+  timeOfDay       String?
+  daysOfWeek      Int[]
   durationSeconds Int
   ringtoneId      String?
-  recurrenceRule  String?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([deviceId])
 }
 
 model Ringtone {
