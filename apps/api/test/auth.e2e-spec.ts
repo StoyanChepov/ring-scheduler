@@ -8,49 +8,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
-
-/**
- * Runs the real modules, guard, JWT and validation over HTTP. Only the
- * database is replaced, with a small in-memory fake, so no Postgres is needed.
- */
-function createFakePrisma() {
-  const users: any[] = [];
-  const devices: any[] = [];
-  const commands: any[] = [];
-
-  return {
-    user: {
-      findUnique: async ({ where }: any) =>
-        users.find((u) =>
-          where.id ? u.id === where.id : u.email === where.email,
-        ) ?? null,
-      create: async ({ data }: any) => {
-        const user = { id: randomUUID(), ...data };
-        users.push(user);
-        return user;
-      },
-    },
-    device: {
-      findMany: async ({ where }: any) =>
-        devices.filter((d) => d.userId === where.userId),
-      create: async ({ data }: any) => {
-        const device = { id: randomUUID(), createdAt: new Date(), ...data };
-        devices.push(device);
-        return device;
-      },
-      findFirst: async ({ where }: any) =>
-        devices.find((d) => d.id === where.id && d.userId === where.userId) ??
-        null,
-    },
-    ringCommand: {
-      create: async ({ data }: any) => {
-        const command = { id: randomUUID(), createdAt: new Date(), ...data };
-        commands.push(command);
-        return command;
-      },
-    },
-  };
-}
+import { createFakePrisma } from './helpers/fake-prisma';
 
 describe('Auth flow (HTTP)', () => {
   const SECRET = 'e2e-secret-that-is-comfortably-over-32-chars';

@@ -20,6 +20,19 @@ const newDeviceName = ref('Mock Android Phone');
 const ringSeconds = ref(30);
 const isLoading = ref(false);
 const message = ref('');
+const messageIsError = ref(false);
+
+type Delivery = {
+  mode: 'mock' | 'fcm';
+  delivered: boolean;
+  message: string;
+};
+
+function showDelivery(delivery: Delivery | undefined, fallback: string) {
+  message.value = delivery?.message ?? fallback;
+  // A command can be saved but still fail to reach the device.
+  messageIsError.value = delivery ? !delivery.delivered : false;
+}
 
 async function loadDevices() {
   isLoading.value = true;
@@ -31,6 +44,7 @@ async function loadDevices() {
   } catch (error) {
     console.error(error);
     message.value = 'Failed to load devices.';
+    messageIsError.value = true;
   } finally {
     isLoading.value = false;
   }
@@ -39,6 +53,7 @@ async function loadDevices() {
 async function createDevice() {
   if (!newDeviceName.value.trim()) {
     message.value = 'Device name is required.';
+    messageIsError.value = true;
     return;
   }
 
@@ -53,10 +68,12 @@ async function createDevice() {
 
     newDeviceName.value = '';
     message.value = 'Device created.';
+    messageIsError.value = false;
     await loadDevices();
   } catch (error) {
     console.error(error);
     message.value = 'Failed to create device.';
+    messageIsError.value = true;
   } finally {
     isLoading.value = false;
   }
@@ -71,11 +88,11 @@ async function ringDevice(device: Device) {
       durationSeconds: Number(ringSeconds.value),
     });
 
-    message.value =
-      response.data?.mockDelivery?.message ?? `Ring command sent to ${device.name}.`;
+    showDelivery(response.data?.delivery, `Ring command sent to ${device.name}.`);
   } catch (error) {
     console.error(error);
     message.value = `Failed to ring ${device.name}.`;
+    messageIsError.value = true;
   } finally {
     isLoading.value = false;
   }
@@ -88,11 +105,11 @@ async function stopDevice(device: Device) {
   try {
     const response = await api.post(`/devices/${device.id}/stop`);
 
-    message.value =
-      response.data?.mockDelivery?.message ?? `Stop command sent to ${device.name}.`;
+    showDelivery(response.data?.delivery, `Stop command sent to ${device.name}.`);
   } catch (error) {
     console.error(error);
     message.value = `Failed to stop ${device.name}.`;
+    messageIsError.value = true;
   } finally {
     isLoading.value = false;
   }
@@ -170,7 +187,7 @@ onMounted(restoreSession);
         <span>seconds</span>
       </div>
 
-      <p v-if="message" class="message">
+      <p v-if="message" class="message" :class="{ error: messageIsError }">
         {{ message }}
       </p>
 
@@ -323,6 +340,12 @@ button.danger {
   background: #eef7ee;
   border: 1px solid #cde8cd;
   border-radius: 12px;
+}
+
+.message.error {
+  background: #fdeceb;
+  border-color: #f3c5c1;
+  color: #b42318;
 }
 
 .muted {
