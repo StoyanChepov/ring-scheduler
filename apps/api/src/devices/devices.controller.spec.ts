@@ -6,7 +6,11 @@ import { DevicesService } from './devices.service';
 describe('DevicesController', () => {
   let controller: DevicesController;
 
-  const devicesService = { findAll: jest.fn(), create: jest.fn() };
+  const devicesService = {
+    findAll: jest.fn(),
+    create: jest.fn(),
+    updateToken: jest.fn(),
+  };
   const user = { id: 'user-1', email: 'a@b.com' };
 
   beforeEach(async () => {
@@ -28,6 +32,18 @@ describe('DevicesController', () => {
 
     await expect(controller.findAll(user)).resolves.toEqual([{ id: 'd1' }]);
     expect(devicesService.findAll).toHaveBeenCalledWith('user-1');
+  });
+
+  it('updates a device token for the authenticated user', async () => {
+    devicesService.updateToken.mockResolvedValue({ id: 'd1' });
+
+    await controller.updateToken(user, 'd1', { fcmToken: 'new-token' });
+
+    expect(devicesService.updateToken).toHaveBeenCalledWith(
+      'user-1',
+      'd1',
+      'new-token',
+    );
   });
 
   it('creates a device for the authenticated user', async () => {
