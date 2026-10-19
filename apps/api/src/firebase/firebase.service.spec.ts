@@ -205,4 +205,85 @@ describe('FirebaseService', () => {
       ).resolves.toMatchObject({ status: 'failed', invalidToken: false });
     });
   });
+
+  describe('checkCredentials', () => {
+    it('reports missing credentials without calling FCM', async () => {
+      const service = createService({});
+      service.onModuleInit();
+
+      const result = await service.checkCredentials();
+
+      expect(result.ok).toBe(false);
+      expect(result.detail).toMatch(/FIREBASE_SERVICE_ACCOUNT/);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    describe('with credentials', () => {
+      let service: FirebaseService;
+
+      beforeEach(() => {
+        service = createService({
+          FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify(ACCOUNT),
+        });
+        service.onModuleInit();
+      });
+
+      it('only validates the message (dry run) and never delivers it', async () => {
+        send.mockResolvedValue('projects/demo/messages/dry');
+
+        await service.checkCredentials();
+
+        expect(send).toHaveBeenCalledTimes(1);
+        expect(send.mock.calls[0][1]).toBe(true);
+        expect(send.mock.calls[0][0].token).not.toMatch(
+          /^[A-Za-z0-9_-]{100,}$/,
+        );
+      });
+
+      it('passes when FCM accepts the message', async () => {
+        send.mockResolvedValue('projects/demo/messages/dry');
+
+        await expect(service.checkCredentials()).resolves.toMatchObject({
+          ok: true,
+        });
+      });
+
+      it.each([
+        'messaging/invalid-argument',
+        'messaging/invalid-registration-token',
+        'messaging/registration-token-not-registered',
+      ])('passes when FCM only rejects the fake token (%s)', async (code) => {
+        send.mockRejectedValue({ code });
+
+        const result = await service.checkCredentials();
+
+        expect(result.ok).toBe(true);
+        expect(result.detail).toContain('demo-project');
+        expect(result.detail).toContain(code);
+      });
+
+      it.each([
+        'messaging/mismatched-credential',
+        'messaging/authentication-error',
+        'messaging/third-party-auth-error',
+        'app/network-error',
+      ])('fails on %s and names the code', async (code) => {
+        send.mockRejectedValue({ code });
+
+        const result = await service.checkCredentials();
+
+        expect(result.ok).toBe(false);
+        expect(result.detail).toContain(code);
+      });
+
+      it('fails, rather than throwing, on an error with no code', async () => {
+        send.mockRejectedValue(new Error('socket hang up'));
+
+        await expect(service.checkCredentials()).resolves.toMatchObject({
+          ok: false,
+          detail: expect.stringContaining('unknown'),
+        });
+      });
+    });
+  });
 });

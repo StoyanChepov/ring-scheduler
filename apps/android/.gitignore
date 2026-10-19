@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+.cxx/
+
+# Firebase app config: not a secret like the server key, but specific to our
+# Firebase project, so each developer downloads their own.
+google-services.json

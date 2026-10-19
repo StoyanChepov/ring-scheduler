@@ -19,6 +19,24 @@ const DEAD_TOKEN_CODES = new Set([
   'messaging/registration-token-not-registered',
 ]);
 
+// Sent in dry-run mode by checkCredentials(). It is deliberately not a real
+// token: FCM rejects it, and *how* it rejects tells us whether our credentials
+// were accepted.
+const PROBE_TOKEN = 'ring-scheduler-credential-check';
+
+// FCM got far enough to look at the token, so it had already accepted the
+// credentials and the request. invalid-argument is what a malformed token
+// (like the probe) usually produces.
+const TOKEN_REJECTED_CODES = new Set([
+  ...DEAD_TOKEN_CODES,
+  'messaging/invalid-argument',
+]);
+
+export interface CredentialCheck {
+  ok: boolean;
+  detail: string;
+}
+
 export interface RingPushPayload {
   commandId: string;
   type: 'RING_START' | 'RING_STOP';
@@ -33,6 +51,7 @@ export type PushOutcome =
 export class FirebaseService implements OnModuleInit {
   private readonly logger = new Logger(FirebaseService.name);
   private app?: App;
+  private projectId?: string;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -57,10 +76,63 @@ export class FirebaseService implements OnModuleInit {
     this.app =
       getApps().find((app) => app.name === APP_NAME) ??
       initializeApp({ credential: cert(serviceAccount) }, APP_NAME);
+    this.projectId = serviceAccount.projectId;
 
     this.logger.log(
       `Firebase push enabled for project "${serviceAccount.projectId}"`,
     );
+  }
+
+  /**
+   * Checks that the configured key really works, without needing a device.
+   * It asks FCM to validate (not deliver) a message to a fake token: a bad key
+   * fails with an authentication error, while a good key gets as far as FCM
+   * rejecting the token. Nothing is ever delivered.
+   */
+  async checkCredentials(): Promise<CredentialCheck> {
+    if (!this.app) {
+      return {
+        ok: false,
+        detail:
+          'No Firebase credentials are configured. Set ' +
+          'FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON.',
+      };
+    }
+
+    const project = `project "${this.projectId}"`;
+
+    try {
+      await getMessaging(this.app).send(
+        { token: PROBE_TOKEN, data: { type: 'CREDENTIAL_CHECK' } },
+        true,
+      );
+
+      return {
+        ok: true,
+        detail: `Firebase accepted the credentials for ${project}.`,
+      };
+    } catch (error) {
+      const code = (error as { code?: string }).code ?? 'unknown';
+
+      if (TOKEN_REJECTED_CODES.has(code)) {
+        return {
+          ok: true,
+          detail:
+            `Firebase accepted the credentials for ${project}; it only ` +
+            `rejected the fake test token (${code}), as expected.`,
+        };
+      }
+
+      return {
+        ok: false,
+        detail:
+          `Firebase did not accept the request for ${project} (${code}). ` +
+          'Check that the key belongs to this project and has not been ' +
+          'revoked, that the Firebase Cloud Messaging API is enabled, and ' +
+          'that this machine can reach Google (a firewall or proxy gives the ' +
+          'same error).',
+      };
+    }
   }
 
   /**
