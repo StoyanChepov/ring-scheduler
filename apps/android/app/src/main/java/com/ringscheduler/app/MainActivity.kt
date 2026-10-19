@@ -2,11 +2,15 @@ package com.ringscheduler.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.view.WindowInsets
@@ -65,6 +69,11 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.registerButton).setOnClickListener { authenticate(register = true) }
         findViewById<Button>(R.id.stopButton).setOnClickListener { RingService.stop(this) }
         findViewById<Button>(R.id.copyTokenButton).setOnClickListener { copyToken() }
+        findViewById<Button>(R.id.allowAlarmScreenButton).setOnClickListener {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName"))
+            )
+        }
         findViewById<Button>(R.id.logoutButton).setOnClickListener {
             session.logout()
             render("Logged out.")
@@ -73,6 +82,16 @@ class MainActivity : Activity() {
         requestNotificationPermission()
         render(if (session.isLoggedIn) "Connected as ${session.email}" else "Log in to connect this phone.")
         syncToken()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Android 14+ lets users (and Play policy) switch off full-screen
+        // alerts; without them a locked phone rings with its screen off.
+        val canShowAlarmScreen = Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+            getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+        findViewById<View>(R.id.allowAlarmScreenButton).visibility =
+            if (canShowAlarmScreen) View.GONE else View.VISIBLE
     }
 
     override fun onDestroy() {

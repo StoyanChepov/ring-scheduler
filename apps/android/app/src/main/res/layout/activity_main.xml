@@ -24,6 +24,15 @@
             android:layout_marginTop="8dp"
             android:textSize="16sp" />
 
+        <!-- Shown when Android won't let the alarm screen appear over the lock screen -->
+        <Button
+            android:id="@+id/allowAlarmScreenButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Allow alarm screen"
+            android:visibility="gone" />
+
         <!-- Shown while logged out -->
         <LinearLayout
             android:id="@+id/loginForm"

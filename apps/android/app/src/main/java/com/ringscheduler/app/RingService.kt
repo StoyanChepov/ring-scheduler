@@ -93,6 +93,7 @@ class RingService : Service() {
             start()
         }
 
+        isRinging = true
         Log.i(TAG, "Ringing started")
     }
 
@@ -101,6 +102,9 @@ class RingService : Service() {
         releasePlayer()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+
+        isRinging = false
+        sendBroadcast(Intent(ACTION_RINGING_STOPPED).setPackage(packageName))
         Log.i(TAG, "Ringing stopped")
     }
 
@@ -122,10 +126,10 @@ class RingService : Service() {
             PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val openIntent = PendingIntent.getActivity(
+        val alarmIntent = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java),
+            Intent(this, AlarmActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE,
         )
 
@@ -140,7 +144,11 @@ class RingService : Service() {
             .setContentTitle(getString(R.string.ring_notification_title))
             .setContentText(getString(R.string.ring_notification_text))
             .setCategory(Notification.CATEGORY_ALARM)
-            .setContentIntent(openIntent)
+            .setContentIntent(alarmIntent)
+            // Screen off or locked: Android opens AlarmActivity straight away.
+            // Phone in use: shown as a heads-up banner instead.
+            .setFullScreenIntent(alarmIntent, true)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .addAction(stopAction)
             .build()
@@ -153,6 +161,13 @@ class RingService : Service() {
         private const val ACTION_STOP = "com.ringscheduler.app.STOP"
         private const val EXTRA_DURATION_SECONDS = "durationSeconds"
         private const val DEFAULT_DURATION_SECONDS = 30
+
+        /** Sent (to this app only) whenever ringing ends, so AlarmActivity can close. */
+        const val ACTION_RINGING_STOPPED = "com.ringscheduler.app.RINGING_STOPPED"
+
+        @Volatile
+        var isRinging = false
+            private set
 
         fun start(context: Context, durationSeconds: Int?) {
             val intent = Intent(context, RingService::class.java)

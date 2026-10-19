@@ -44,6 +44,8 @@ adb connect <ip>:<port shown on the Wireless debugging screen>
 
 ## Known limitations
 
+- If Android 14+ switches off full-screen alerts for the app, the main screen
+  shows "Allow alarm screen"; without it a locked phone rings with the screen off.
 - Login tokens expire after an hour; after that the app cannot upload a
   rotated FCM token until someone logs in again.
 - Uses `FirebaseMessaging.getToken()`/`onNewToken()`, deprecated in
