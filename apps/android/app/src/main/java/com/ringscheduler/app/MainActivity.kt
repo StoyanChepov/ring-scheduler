@@ -251,7 +251,8 @@ class MainActivity : Activity() {
 
     private fun describe(e: Exception): String = when (e) {
         is ApiException -> e.message ?: "HTTP ${e.status}"
-        is java.net.ConnectException -> "can't connect to ${serverUrl.text}. Is the API running and adb reverse set up?"
+        is java.net.ConnectException, is java.net.UnknownHostException ->
+            "can't reach ${serverUrl.text}. Check the server address and your internet connection."
         else -> e.message ?: e.javaClass.simpleName
     }
 

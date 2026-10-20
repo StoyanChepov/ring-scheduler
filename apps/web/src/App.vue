@@ -21,6 +21,10 @@ const { user, isLoggedIn, isRestoring, restoreSession, logout } = useAuth();
 
 const devices = ref<Device[]>([]);
 const newDeviceName = ref('Mock Android Phone');
+// Always the newest GitHub release's APK.
+const APK_URL =
+  'https://github.com/StoyanChepov/ring-scheduler/releases/latest/download/ring-scheduler.apk';
+
 const ringSeconds = ref(30);
 // '' means the phone's own alarm sound.
 const ringRingtoneId = ref('');
@@ -148,6 +152,8 @@ onMounted(restoreSession);
       <p class="subtitle">
         Ring your devices now, or schedule alarms that ring even when the phone is offline.
       </p>
+      <a class="download" :href="APK_URL">Get the Android app</a>
+      <span class="muted download-note">Android 8 or newer · install the APK, then log in with the same account</span>
     </section>
 
     <p v-if="isRestoring" class="muted session-note">Restoring your session...</p>
@@ -277,6 +283,21 @@ h1 {
   max-width: 680px;
   color: #52627a;
   font-size: 18px;
+}
+
+.download {
+  display: inline-block;
+  margin-right: 12px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: #172033;
+  color: white;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.download-note {
+  font-size: 14px;
 }
 
 .card {

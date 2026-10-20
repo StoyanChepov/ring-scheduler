@@ -26,6 +26,25 @@ one. The user's one-hour login token is never stored on the phone.
 3. Open `apps/android` in Android Studio and run on a phone with Google Play
    services. An emulator needs a "Google Play" system image.
 
+## Release build (for sharing)
+
+Release builds default to the deployed API (`https://ring-scheduler.vercel.app`)
+and only allow HTTPS. They are signed with the key in `keystore/`, whose
+passwords are in `keystore.properties`; both are git-ignored. **Back them up**:
+an installed app can only be updated by an APK signed with the same key.
+
+```
+./gradlew assembleRelease
+# -> app/build/outputs/apk/release/ring-scheduler-release.apk
+```
+
+To publish, create a GitHub release and attach the APK renamed to
+`ring-scheduler.apk`; the website's "Get the Android app" button always
+points at the latest release's `ring-scheduler.apk`.
+
+A phone that has the debug build must uninstall it before installing the
+release build (different signing keys).
+
 ## Reaching the local API
 
 The app's default server URL is `http://localhost:3000`. Forward it to the PC:

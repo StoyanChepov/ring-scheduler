@@ -35,7 +35,7 @@ class Session(context: Context) {
     }
 
     companion object {
-        // With `adb reverse tcp:3000 tcp:3000`, localhost on the phone is the PC.
-        const val DEFAULT_SERVER_URL = "http://localhost:3000"
+        // Release: the deployed API. Debug: http://localhost:3000 (see build.gradle.kts).
+        val DEFAULT_SERVER_URL: String = BuildConfig.DEFAULT_SERVER_URL
     }
 }
