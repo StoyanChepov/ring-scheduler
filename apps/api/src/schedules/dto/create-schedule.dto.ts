@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   IsISO8601,
+  IsUUID,
   IsOptional,
   IsString,
   Matches,
@@ -54,6 +55,11 @@ export class CreateScheduleDto {
   @IsString()
   @MaxLength(80)
   label?: string;
+
+  /** One of the user's ringtones; omitted means the phone's alarm sound. */
+  @IsOptional()
+  @IsUUID()
+  ringtoneId?: string;
 }
 
 export class UpdateScheduleDto {
@@ -71,4 +77,9 @@ export class UpdateScheduleDto {
   @IsString()
   @MaxLength(80)
   label?: string;
+
+  /** null switches back to the phone's alarm sound. */
+  @IsOptional()
+  @IsUUID()
+  ringtoneId?: string | null;
 }

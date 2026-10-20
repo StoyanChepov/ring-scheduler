@@ -3,7 +3,9 @@ import { onMounted, ref, watch } from 'vue';
 import AuthForm from './components/AuthForm.vue';
 import DeviceActivity from './components/DeviceActivity.vue';
 import DeviceSchedules from './components/DeviceSchedules.vue';
+import RingtonesCard from './components/RingtonesCard.vue';
 import { useAuth } from './composables/useAuth';
+import { useRingtones } from './composables/useRingtones';
 import { api } from './services/api';
 
 type Device = {
@@ -20,6 +22,9 @@ const { user, isLoggedIn, isRestoring, restoreSession, logout } = useAuth();
 const devices = ref<Device[]>([]);
 const newDeviceName = ref('Mock Android Phone');
 const ringSeconds = ref(30);
+// '' means the phone's own alarm sound.
+const ringRingtoneId = ref('');
+const { ringtones, load: loadRingtones, clear: clearRingtones } = useRingtones();
 const isLoading = ref(false);
 const message = ref('');
 const messageIsError = ref(false);
@@ -88,6 +93,7 @@ async function ringDevice(device: Device) {
   try {
     const response = await api.post(`/devices/${device.id}/ring`, {
       durationSeconds: Number(ringSeconds.value),
+      ...(ringRingtoneId.value && { ringtoneId: ringRingtoneId.value }),
     });
 
     showDelivery(response.data?.delivery, `Ring command sent to ${device.name}.`);
@@ -122,9 +128,12 @@ async function stopDevice(device: Device) {
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) {
     loadDevices();
+    loadRingtones().catch((error) => console.error(error));
   } else {
     devices.value = [];
     message.value = '';
+    ringRingtoneId.value = '';
+    clearRingtones();
   }
 });
 
@@ -187,6 +196,14 @@ onMounted(restoreSession);
           max="300"
         />
         <span>seconds</span>
+
+        <label for="ring-sound">Sound</label>
+        <select id="ring-sound" v-model="ringRingtoneId">
+          <option value="">Phone's alarm sound</option>
+          <option v-for="tone in ringtones" :key="tone.id" :value="tone.id">
+            {{ tone.name }}
+          </option>
+        </select>
       </div>
 
       <p v-if="message" class="message" :class="{ error: messageIsError }">
@@ -223,6 +240,8 @@ onMounted(restoreSession);
         </li>
       </ul>
     </section>
+
+    <RingtonesCard />
     </template>
   </main>
 </template>
@@ -309,7 +328,15 @@ input {
 }
 
 .duration-row {
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+select {
+  padding: 12px 14px;
+  border: 1px solid #cfd7e6;
+  border-radius: 12px;
+  font-size: 15px;
 }
 
 .duration-row input {

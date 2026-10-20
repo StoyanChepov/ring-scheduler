@@ -19,6 +19,8 @@ data class Schedule(
     val daysOfWeek: Set<Int>,
     val durationSeconds: Int,
     val label: String?,
+    /** An uploaded ringtone, or null for the phone's alarm sound. */
+    val ringtoneId: String? = null,
 ) {
     /**
      * When this alarm should next ring after [now], or null if it never will
@@ -52,6 +54,7 @@ data class Schedule(
         .put("daysOfWeek", JSONArray(daysOfWeek.sorted()))
         .put("durationSeconds", durationSeconds)
         .put("label", label ?: JSONObject.NULL)
+        .put("ringtoneId", ringtoneId ?: JSONObject.NULL)
 
     companion object {
         const val ONE_TIME = "ONE_TIME"
@@ -67,6 +70,7 @@ data class Schedule(
                 daysOfWeek = (0 until days.length()).map { days.getInt(it) }.toSet(),
                 durationSeconds = json.getInt("durationSeconds"),
                 label = json.optStringOrNull("label"),
+                ringtoneId = json.optStringOrNull("ringtoneId"),
             )
         }
 
@@ -77,7 +81,8 @@ data class Schedule(
             JSONArray().apply { schedules.forEach { put(it.toJson()) } }
 
         // optString turns JSON null into the string "null".
+        // (and a missing key counts as null, for caches saved before the field existed).
         private fun JSONObject.optStringOrNull(key: String): String? =
-            if (isNull(key)) null else optString(key)
+            if (!has(key) || isNull(key)) null else optString(key)
     }
 }

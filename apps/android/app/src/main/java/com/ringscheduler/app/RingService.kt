@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -50,14 +51,14 @@ class RingService : Service() {
         current?.let { EventReporter.record(this, EventReporter.STOPPED, it, "Replaced by another ring") }
         current = request
 
-        try {
-            startPlaying()
+        val note = try {
+            startPlaying(request.ringtoneId)
         } catch (e: Exception) {
             Log.e(TAG, "Could not play the alarm sound", e)
             stopRinging(EventReporter.FAILED, "Could not play the alarm sound: ${e.message}")
             return START_NOT_STICKY
         }
-        EventReporter.record(this, EventReporter.STARTED, request)
+        EventReporter.record(this, EventReporter.STARTED, request, note)
 
         handler.removeCallbacks(stopRunnable)
         handler.postDelayed(stopRunnable, request.durationSeconds * 1000L)
@@ -86,15 +87,44 @@ class RingService : Service() {
         }
     }
 
-    private fun startPlaying() {
-        if (player?.isPlaying == true) return
-
+    /**
+     * Plays the uploaded ringtone, or the phone's alarm sound. Returns a note
+     * for the history when the ringtone had to be replaced by the default.
+     */
+    private fun startPlaying(ringtoneId: String?): String? {
         releasePlayer()
+
+        val custom = ringtoneId?.let { RingtoneStore.fileFor(this, it) }
+
+        if (custom != null) {
+            try {
+                player = createPlayer(Uri.fromFile(custom))
+                return null.also { markRinging() }
+            } catch (e: Exception) {
+                Log.w(TAG, "Ringtone $ringtoneId could not be played", e)
+                releasePlayer()
+            }
+        }
 
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        player = createPlayer(uri)
+        markRinging()
 
-        player = MediaPlayer().apply {
+        return when {
+            ringtoneId == null -> null
+            custom == null -> "Ringtone not downloaded yet; played the default alarm sound"
+            else -> "Ringtone could not be played; played the default alarm sound"
+        }
+    }
+
+    private fun markRinging() {
+        isRinging = true
+        Log.i(TAG, "Ringing started")
+    }
+
+    private fun createPlayer(uri: Uri): MediaPlayer =
+        MediaPlayer().apply {
             // The alarm stream plays even when the phone is on silent.
             setAudioAttributes(
                 AudioAttributes.Builder()
@@ -108,10 +138,6 @@ class RingService : Service() {
             prepare()
             start()
         }
-
-        isRinging = true
-        Log.i(TAG, "Ringing started")
-    }
 
     /** Ends ringing and records how it ended (if something was ringing). */
     private fun stopRinging(eventType: String, detail: String?) {
@@ -183,6 +209,7 @@ class RingService : Service() {
         private const val EXTRA_SOURCE = "source"
         private const val EXTRA_SCHEDULE_ID = "scheduleId"
         private const val EXTRA_COMMAND_ID = "commandId"
+        private const val EXTRA_RINGTONE_ID = "ringtoneId"
         private const val EXTRA_STOPPED_BY = "stoppedBy"
         const val DEFAULT_DURATION_SECONDS = 30
 
@@ -207,6 +234,7 @@ class RingService : Service() {
                 .putExtra(EXTRA_SOURCE, request.source)
                 .putExtra(EXTRA_SCHEDULE_ID, request.scheduleId)
                 .putExtra(EXTRA_COMMAND_ID, request.commandId)
+                .putExtra(EXTRA_RINGTONE_ID, request.ringtoneId)
 
             try {
                 context.startForegroundService(intent)
@@ -237,6 +265,7 @@ class RingService : Service() {
             scheduleId = intent.getStringExtra(EXTRA_SCHEDULE_ID),
             commandId = intent.getStringExtra(EXTRA_COMMAND_ID),
             durationSeconds = intent.getIntExtra(EXTRA_DURATION_SECONDS, DEFAULT_DURATION_SECONDS),
+            ringtoneId = intent.getStringExtra(EXTRA_RINGTONE_ID),
         )
 
         private fun createChannel(context: Context) {

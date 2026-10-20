@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { FirebaseService } from '../firebase/firebase.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RingtonesService } from '../ringtones/ringtones.service';
 import {
   CreateScheduleDto,
   UpdateScheduleDto,
@@ -27,6 +28,7 @@ export interface DeviceSchedule {
   daysOfWeek: number[];
   durationSeconds: number;
   label: string | null;
+  ringtoneId: string | null;
 }
 
 @Injectable()
@@ -36,6 +38,7 @@ export class SchedulesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly firebase: FirebaseService,
+    private readonly ringtones: RingtonesService,
   ) {}
 
   async list(userId: string, deviceId: string) {
@@ -49,6 +52,10 @@ export class SchedulesService {
 
   async create(userId: string, deviceId: string, dto: CreateScheduleDto) {
     const device = await this.findOwnedDevice(userId, deviceId);
+
+    if (dto.ringtoneId) {
+      await this.ringtones.assertOwned(userId, dto.ringtoneId);
+    }
 
     if (dto.kind === 'ONE_TIME' && new Date(dto.startAt!) <= new Date()) {
       throw new BadRequestException('startAt must be in the future');
@@ -72,6 +79,7 @@ export class SchedulesService {
         kind: dto.kind,
         label: dto.label,
         durationSeconds: dto.durationSeconds,
+        ringtoneId: dto.ringtoneId,
         ...(dto.kind === 'ONE_TIME'
           ? { startAt: new Date(dto.startAt!), daysOfWeek: [] }
           : {
@@ -92,6 +100,10 @@ export class SchedulesService {
     dto: UpdateScheduleDto,
   ) {
     const device = await this.findOwnedDevice(userId, deviceId);
+
+    if (dto.ringtoneId) {
+      await this.ringtones.assertOwned(userId, dto.ringtoneId);
+    }
 
     // The device ID in the filter stops a schedule from another device (and
     // so possibly another user) being changed through this one's URL.
@@ -146,6 +158,7 @@ export class SchedulesService {
       daysOfWeek: s.daysOfWeek,
       durationSeconds: s.durationSeconds,
       label: s.label,
+      ringtoneId: s.ringtoneId,
     }));
   }
 

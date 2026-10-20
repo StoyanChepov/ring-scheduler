@@ -13,6 +13,7 @@ export function createFakePrisma() {
   const commands: any[] = [];
   const schedules: any[] = [];
   const events: any[] = [];
+  const ringtones: any[] = [];
 
   // Only the filters SchedulesService uses: deviceId, isActive and an OR of
   // { kind } / { startAt: { gt } }.
@@ -58,10 +59,21 @@ export function createFakePrisma() {
       },
     },
     device: {
-      findMany: async ({ where, omit }: any) =>
+      // Supports the ringtone lookup: devices with a schedule using a ringtone.
+      findMany: async ({ where, omit, select }: any) =>
         devices
           .filter((d) => d.userId === where.userId)
-          .map((d) => withoutOmitted(d, omit)),
+          .filter((d) => !where.platform || d.platform === where.platform)
+          .filter(
+            (d) =>
+              !where.schedules ||
+              schedules.some(
+                (s) =>
+                  s.deviceId === d.id &&
+                  s.ringtoneId === where.schedules.some.ringtoneId,
+              ),
+          )
+          .map((d) => selected(withoutOmitted(d, omit), select)),
       findUnique: async ({ where, select }: any) =>
         selected(
           devices.find((d) =>
@@ -144,6 +156,38 @@ export function createFakePrisma() {
           .sort((a, b) => b.occurredAt - a.occurredAt)
           .slice(0, take),
     },
+    ringtone: {
+      findMany: async ({ where, omit }: any) =>
+        ringtones
+          .filter((r) => r.userId === where.userId)
+          .map((r) => withoutOmitted(r, omit)),
+      count: async ({ where }: any) =>
+        ringtones.filter((r) => r.userId === where.userId).length,
+      create: async ({ data, omit }: any) => {
+        const ringtone = { id: randomUUID(), createdAt: new Date(), ...data };
+        ringtones.push(ringtone);
+        return withoutOmitted(ringtone, omit);
+      },
+      findFirst: async ({ where, select }: any) =>
+        selected(
+          ringtones.find(
+            (r) => r.id === where.id && r.userId === where.userId,
+          ) ?? null,
+          select,
+        ),
+      // Like the real foreign key: schedules using it fall back to null.
+      deleteMany: async ({ where }: any) => {
+        const index = ringtones.findIndex(
+          (r) => r.id === where.id && r.userId === where.userId,
+        );
+        if (index === -1) return { count: 0 };
+        ringtones.splice(index, 1);
+        schedules
+          .filter((sched) => sched.ringtoneId === where.id)
+          .forEach((sched) => (sched.ringtoneId = null));
+        return { count: 1 };
+      },
+    },
     ringSchedule: {
       findMany: async ({ where }: any) =>
         schedules.filter((s) => matchesSchedule(s, where)),
@@ -162,7 +206,7 @@ export function createFakePrisma() {
           ...data,
         };
         // Prisma stores an omitted optional column as null.
-        for (const key of ['label', 'startAt', 'timeOfDay'])
+        for (const key of ['label', 'startAt', 'timeOfDay', 'ringtoneId'])
           schedule[key] ??= null;
         schedules.push(schedule);
         return schedule;

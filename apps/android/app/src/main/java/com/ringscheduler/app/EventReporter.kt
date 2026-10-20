@@ -14,6 +14,7 @@ data class RingRequest(
     val scheduleId: String? = null,
     val commandId: String? = null,
     val durationSeconds: Int,
+    val ringtoneId: String? = null,
 ) {
     companion object {
         const val SCHEDULE = "SCHEDULE"

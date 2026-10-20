@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { isAxiosError } from 'axios';
+import { useRingtones } from '../composables/useRingtones';
 import { api } from '../services/api';
 
 type Schedule = {
@@ -11,6 +12,7 @@ type Schedule = {
   daysOfWeek: number[];
   durationSeconds: number;
   label: string | null;
+  ringtoneId: string | null;
   isActive: boolean;
 };
 
@@ -37,6 +39,9 @@ const timeOfDay = ref('07:00');
 const days = ref<number[]>([1, 2, 3, 4, 5]);
 const durationSeconds = ref(30);
 const label = ref('');
+// '' means the phone's own alarm sound.
+const ringtoneId = ref('');
+const { ringtones, nameOf } = useRingtones();
 
 const url = computed(() => `/devices/${props.deviceId}/schedules`);
 
@@ -116,6 +121,7 @@ function addSchedule() {
   const common = {
     durationSeconds: Number(durationSeconds.value),
     ...(label.value.trim() && { label: label.value.trim() }),
+    ...(ringtoneId.value && { ringtoneId: ringtoneId.value }),
   };
 
   // datetime-local has no time zone; new Date() reads it as this browser's
@@ -164,7 +170,7 @@ onMounted(load);
         <div>
           <strong>{{ describe(schedule) }}</strong>
           <span class="muted small">
-            · {{ schedule.durationSeconds }}s<template v-if="schedule.label"> · {{ schedule.label }}</template>
+            · {{ schedule.durationSeconds }}s · {{ nameOf(schedule.ringtoneId) }}<template v-if="schedule.label"> · {{ schedule.label }}</template>
           </span>
         </div>
 
@@ -228,6 +234,12 @@ onMounted(load);
           class="narrow"
         />
         <span class="muted small">sec</span>
+        <select v-model="ringtoneId" aria-label="Sound">
+          <option value="">Phone's alarm sound</option>
+          <option v-for="tone in ringtones" :key="tone.id" :value="tone.id">
+            {{ tone.name }}
+          </option>
+        </select>
         <button type="submit" :disabled="isBusy || (kind === 'WEEKLY' && days.length === 0)">
           Add alarm
         </button>

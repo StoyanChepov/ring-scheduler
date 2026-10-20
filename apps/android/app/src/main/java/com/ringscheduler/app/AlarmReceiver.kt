@@ -26,6 +26,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         source = RingRequest.SCHEDULE,
                         scheduleId = schedule.id,
                         durationSeconds = schedule.durationSeconds,
+                        ringtoneId = schedule.ringtoneId,
                     ),
                 )
             } catch (e: IllegalStateException) {

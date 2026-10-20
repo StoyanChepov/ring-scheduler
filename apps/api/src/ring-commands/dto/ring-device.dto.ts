@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
 export class RingDeviceDto {
   @IsOptional()
@@ -6,4 +6,9 @@ export class RingDeviceDto {
   @Min(1)
   @Max(300)
   durationSeconds: number = 30;
+
+  /** One of the user's ringtones; omitted means the phone's alarm sound. */
+  @IsOptional()
+  @IsUUID()
+  ringtoneId?: string;
 }

@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../firebase/firebase.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RingtonesService } from '../ringtones/ringtones.service';
 import { RingDeviceDto } from './dto/ring-device.dto';
 
 type CommandType = 'RING_START' | 'RING_STOP';
@@ -26,10 +27,21 @@ export class RingCommandsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly firebase: FirebaseService,
+    private readonly ringtones: RingtonesService,
   ) {}
 
-  ringDevice(userId: string, deviceId: string, dto: RingDeviceDto) {
-    return this.dispatch(userId, deviceId, 'RING_START', dto.durationSeconds);
+  async ringDevice(userId: string, deviceId: string, dto: RingDeviceDto) {
+    if (dto.ringtoneId) {
+      await this.ringtones.assertOwned(userId, dto.ringtoneId);
+    }
+
+    return this.dispatch(
+      userId,
+      deviceId,
+      'RING_START',
+      dto.durationSeconds,
+      dto.ringtoneId,
+    );
   }
 
   stopDevice(userId: string, deviceId: string) {
@@ -41,6 +53,7 @@ export class RingCommandsService {
     deviceId: string,
     type: CommandType,
     durationSeconds?: number,
+    ringtoneId?: string,
   ) {
     const device = await this.findOwnedDevice(userId, deviceId);
 
@@ -52,6 +65,7 @@ export class RingCommandsService {
         type,
         status: 'CREATED',
         ...(durationSeconds !== undefined && { durationSeconds }),
+        ...(ringtoneId && { ringtoneId }),
       },
     });
 
@@ -60,6 +74,7 @@ export class RingCommandsService {
       command.id,
       type,
       durationSeconds,
+      ringtoneId,
     );
 
     const updated = await this.prisma.ringCommand.update({
@@ -75,6 +90,7 @@ export class RingCommandsService {
     commandId: string,
     type: CommandType,
     durationSeconds?: number,
+    ringtoneId?: string,
   ): Promise<DeliveryResult> {
     const action = type === 'RING_START' ? 'Ring' : 'Stop';
 
@@ -113,6 +129,7 @@ export class RingCommandsService {
       commandId,
       type,
       durationSeconds,
+      ringtoneId,
     });
 
     if (outcome.status === 'sent') {

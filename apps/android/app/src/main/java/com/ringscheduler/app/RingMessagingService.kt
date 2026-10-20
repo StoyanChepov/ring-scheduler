@@ -13,15 +13,23 @@ class RingMessagingService : FirebaseMessagingService() {
 
         try {
             when (data["type"]) {
-                "RING_START" -> RingService.start(
-                    this,
-                    RingRequest(
-                        source = RingRequest.COMMAND,
-                        commandId = data["commandId"],
-                        durationSeconds = data["durationSeconds"]?.toIntOrNull()
-                            ?: RingService.DEFAULT_DURATION_SECONDS,
-                    ),
-                )
+                "RING_START" -> {
+                    val ringtoneId = data["ringtoneId"]
+                    // Fetch it now if needed, but briefly: Android only allows
+                    // starting the ring for a short while after the push.
+                    ringtoneId?.let { RingtoneStore.ensure(this, it, timeoutMs = 4_000) }
+
+                    RingService.start(
+                        this,
+                        RingRequest(
+                            source = RingRequest.COMMAND,
+                            commandId = data["commandId"],
+                            durationSeconds = data["durationSeconds"]?.toIntOrNull()
+                                ?: RingService.DEFAULT_DURATION_SECONDS,
+                            ringtoneId = ringtoneId,
+                        ),
+                    )
+                }
                 "RING_STOP" -> RingService.stop(this, RingService.STOPPED_FROM_DASHBOARD)
                 "SCHEDULES_CHANGED" -> syncSchedules()
                 else -> Log.w(TAG, "Ignoring unknown message type ${data["type"]}")
