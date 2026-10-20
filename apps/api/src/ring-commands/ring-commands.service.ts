@@ -55,7 +55,12 @@ export class RingCommandsService {
       },
     });
 
-    const delivery = await this.deliver(device, command.id, type, durationSeconds);
+    const delivery = await this.deliver(
+      device,
+      command.id,
+      type,
+      durationSeconds,
+    );
 
     const updated = await this.prisma.ringCommand.update({
       where: { id: command.id },
@@ -76,7 +81,9 @@ export class RingCommandsService {
     if (device.platform === 'MOCK') {
       this.logger.log(
         `[MOCK_DEVICE] ${action} ${device.name}` +
-          (durationSeconds !== undefined ? ` for ${durationSeconds} seconds` : ''),
+          (durationSeconds !== undefined
+            ? ` for ${durationSeconds} seconds`
+            : ''),
       );
 
       return {

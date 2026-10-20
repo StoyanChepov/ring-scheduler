@@ -60,7 +60,9 @@ adb connect <ip>:<port shown on the Wireless debugging screen>
 - If Android 14+ switches off full-screen alerts for the app, the main screen
   shows "Allow alarm screen"; without it a locked phone rings with the screen off.
 - Uses `FirebaseMessaging.getToken()`/`onNewToken()`, deprecated in
-  firebase-messaging 26 in favour of `register()`/`onRegistered()`.
+  firebase-messaging 26. The replacement (`register()`/`onRegistered()`) is
+  opt-in behind a manifest flag that changes the registration scheme, so the
+  app stays on the old API for now.
 - Weekly alarms follow the phone's current time zone; one-time alarms are a
   fixed moment.
 - Schedule changes reach the phone by push. If that push is lost, the phone

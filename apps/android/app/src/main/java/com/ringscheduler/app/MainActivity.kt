@@ -179,9 +179,12 @@ class MainActivity : Activity() {
     }
 
     // Called on the background thread; blocks until Firebase returns the token.
-    // TODO: getToken() is deprecated in firebase-messaging 26 in favour of
-    // register() + FirebaseMessagingService.onRegistered(); migrate once the
-    // basic flow is verified on a device.
+    // getToken() is deprecated in firebase-messaging 26 in favour of
+    // register() + onRegistered(), but that API is opt-in: register() fails
+    // unless the manifest sets firebase_messaging_installation_id_enabled,
+    // which moves the app to a different registration scheme. Stay on
+    // getToken() until that scheme is the default and the Admin SDK documents
+    // sending to it.
     @Suppress("DEPRECATION")
     private fun currentFcmToken(): String {
         val token = Tasks.await(FirebaseMessaging.getInstance().token)
