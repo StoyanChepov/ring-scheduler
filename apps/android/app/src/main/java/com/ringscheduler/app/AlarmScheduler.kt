@@ -33,6 +33,10 @@ object AlarmScheduler {
 
         Log.i(TAG, "Synced ${schedules.size} schedule(s)")
         rescheduleAll(context)
+
+        // After the alarms are set, so a slow download can't delay them. An
+        // alarm whose ringtone isn't cached plays the default sound instead.
+        RingtoneStore.sync(context, schedules.mapNotNull { it.ringtoneId }.toSet())
         return schedules
     }
 

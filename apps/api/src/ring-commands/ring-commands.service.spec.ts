@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access --
+   jest.fn() mock calls are untyped by nature. */
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { FirebaseService } from '../firebase/firebase.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RingtonesService } from '../ringtones/ringtones.service';
 import { RingCommandsService } from './ring-commands.service';
 
 describe('RingCommandsService', () => {
@@ -12,6 +15,7 @@ describe('RingCommandsService', () => {
     ringCommand: { create: jest.fn(), update: jest.fn() },
   };
   const firebase = { isEnabled: true, sendRingCommand: jest.fn() };
+  const ringtones = { assertOwned: jest.fn() };
 
   const mockDevice = {
     id: 'device-1',
@@ -40,11 +44,35 @@ describe('RingCommandsService', () => {
         RingCommandsService,
         { provide: PrismaService, useValue: prisma },
         { provide: FirebaseService, useValue: firebase },
+        { provide: RingtonesService, useValue: ringtones },
       ],
     }).compile();
 
     module.useLogger(false);
     service = module.get(RingCommandsService);
+  });
+
+  it('sends a chosen ringtone along, after checking it is the user’s', async () => {
+    const ringtoneId = '33333333-3333-4333-8333-333333333333';
+    prisma.device.findFirst.mockResolvedValue(androidDevice);
+    firebase.sendRingCommand.mockResolvedValue({
+      status: 'sent',
+      messageId: 'm',
+    });
+
+    await service.ringDevice('user-1', 'device-1', {
+      durationSeconds: 30,
+      ringtoneId,
+    });
+
+    expect(ringtones.assertOwned).toHaveBeenCalledWith('user-1', ringtoneId);
+    expect(firebase.sendRingCommand).toHaveBeenCalledWith(
+      'fcm-token-1',
+      expect.objectContaining({ ringtoneId }),
+    );
+    expect(prisma.ringCommand.create.mock.calls[0][0].data.ringtoneId).toBe(
+      ringtoneId,
+    );
   });
 
   it('looks the device up by owner, so other users cannot ring it', async () => {

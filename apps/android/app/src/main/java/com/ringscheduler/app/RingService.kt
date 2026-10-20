@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -26,25 +27,41 @@ class RingService : Service() {
 
     private var player: MediaPlayer? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val stopRunnable = Runnable { stopRinging() }
+    private val stopRunnable = Runnable { stopRinging(EventReporter.FINISHED, null) }
+
+    /** The ring that is playing, for its history events. */
+    private var current: RingRequest? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            stopRinging()
+            stopRinging(EventReporter.STOPPED, intent.getStringExtra(EXTRA_STOPPED_BY))
             return START_NOT_STICKY
         }
 
-        val durationSeconds = intent?.getIntExtra(EXTRA_DURATION_SECONDS, DEFAULT_DURATION_SECONDS)
-            ?: DEFAULT_DURATION_SECONDS
+        val request = intent?.let(::requestFrom)
+            ?: RingRequest(RingRequest.COMMAND, durationSeconds = DEFAULT_DURATION_SECONDS)
 
+        // Must come first: Android kills a foreground service that doesn't
+        // call startForeground() promptly.
         startInForeground()
-        startPlaying()
 
-        // A new ring while already ringing restarts the countdown.
+        // A new ring while already ringing takes over (and restarts the countdown).
+        current?.let { EventReporter.record(this, EventReporter.STOPPED, it, "Replaced by another ring") }
+        current = request
+
+        val note = try {
+            startPlaying(request.ringtoneId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not play the alarm sound", e)
+            stopRinging(EventReporter.FAILED, "Could not play the alarm sound: ${e.message}")
+            return START_NOT_STICKY
+        }
+        EventReporter.record(this, EventReporter.STARTED, request, note)
+
         handler.removeCallbacks(stopRunnable)
-        handler.postDelayed(stopRunnable, durationSeconds * 1000L)
+        handler.postDelayed(stopRunnable, request.durationSeconds * 1000L)
 
         // If Android kills the service, don't restart it and ring again later.
         return START_NOT_STICKY
@@ -70,15 +87,44 @@ class RingService : Service() {
         }
     }
 
-    private fun startPlaying() {
-        if (player?.isPlaying == true) return
-
+    /**
+     * Plays the uploaded ringtone, or the phone's alarm sound. Returns a note
+     * for the history when the ringtone had to be replaced by the default.
+     */
+    private fun startPlaying(ringtoneId: String?): String? {
         releasePlayer()
+
+        val custom = ringtoneId?.let { RingtoneStore.fileFor(this, it) }
+
+        if (custom != null) {
+            try {
+                player = createPlayer(Uri.fromFile(custom))
+                return null.also { markRinging() }
+            } catch (e: Exception) {
+                Log.w(TAG, "Ringtone $ringtoneId could not be played", e)
+                releasePlayer()
+            }
+        }
 
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        player = createPlayer(uri)
+        markRinging()
 
-        player = MediaPlayer().apply {
+        return when {
+            ringtoneId == null -> null
+            custom == null -> "Ringtone not downloaded yet; played the default alarm sound"
+            else -> "Ringtone could not be played; played the default alarm sound"
+        }
+    }
+
+    private fun markRinging() {
+        isRinging = true
+        Log.i(TAG, "Ringing started")
+    }
+
+    private fun createPlayer(uri: Uri): MediaPlayer =
+        MediaPlayer().apply {
             // The alarm stream plays even when the phone is on silent.
             setAudioAttributes(
                 AudioAttributes.Builder()
@@ -93,11 +139,11 @@ class RingService : Service() {
             start()
         }
 
-        isRinging = true
-        Log.i(TAG, "Ringing started")
-    }
+    /** Ends ringing and records how it ended (if something was ringing). */
+    private fun stopRinging(eventType: String, detail: String?) {
+        current?.let { EventReporter.record(this, eventType, it, detail) }
+        current = null
 
-    private fun stopRinging() {
         handler.removeCallbacks(stopRunnable)
         releasePlayer()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -122,7 +168,7 @@ class RingService : Service() {
         val stopIntent = PendingIntent.getService(
             this,
             0,
-            Intent(this, RingService::class.java).setAction(ACTION_STOP),
+            stopIntent(this, STOPPED_ON_PHONE),
             PendingIntent.FLAG_IMMUTABLE,
         )
 
@@ -160,7 +206,16 @@ class RingService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "com.ringscheduler.app.STOP"
         private const val EXTRA_DURATION_SECONDS = "durationSeconds"
-        private const val DEFAULT_DURATION_SECONDS = 30
+        private const val EXTRA_SOURCE = "source"
+        private const val EXTRA_SCHEDULE_ID = "scheduleId"
+        private const val EXTRA_COMMAND_ID = "commandId"
+        private const val EXTRA_RINGTONE_ID = "ringtoneId"
+        private const val EXTRA_STOPPED_BY = "stoppedBy"
+        const val DEFAULT_DURATION_SECONDS = 30
+
+        /** Who stopped a ring, as shown in its history. */
+        const val STOPPED_ON_PHONE = "Stopped on the phone"
+        const val STOPPED_FROM_DASHBOARD = "Stopped from the dashboard"
 
         /** Sent (to this app only) whenever ringing ends, so AlarmActivity can close. */
         const val ACTION_RINGING_STOPPED = "com.ringscheduler.app.RINGING_STOPPED"
@@ -169,17 +224,49 @@ class RingService : Service() {
         var isRinging = false
             private set
 
-        fun start(context: Context, durationSeconds: Int?) {
+        /**
+         * Starts ringing. If Android refuses to start the service from the
+         * background, that is recorded as a failed ring and rethrown.
+         */
+        fun start(context: Context, request: RingRequest) {
             val intent = Intent(context, RingService::class.java)
-                .putExtra(EXTRA_DURATION_SECONDS, durationSeconds ?: DEFAULT_DURATION_SECONDS)
-            context.startForegroundService(intent)
+                .putExtra(EXTRA_DURATION_SECONDS, request.durationSeconds)
+                .putExtra(EXTRA_SOURCE, request.source)
+                .putExtra(EXTRA_SCHEDULE_ID, request.scheduleId)
+                .putExtra(EXTRA_COMMAND_ID, request.commandId)
+                .putExtra(EXTRA_RINGTONE_ID, request.ringtoneId)
+
+            try {
+                context.startForegroundService(intent)
+            } catch (e: IllegalStateException) {
+                EventReporter.record(
+                    context,
+                    EventReporter.FAILED,
+                    request,
+                    "Android did not allow ringing from the background",
+                )
+                throw e
+            }
         }
 
-        fun stop(context: Context) {
+        fun stop(context: Context, stoppedBy: String) {
             // startService, not stopService, so a stop that arrives before the
             // service is up still goes through stopRinging().
-            context.startService(Intent(context, RingService::class.java).setAction(ACTION_STOP))
+            context.startService(stopIntent(context, stoppedBy))
         }
+
+        private fun stopIntent(context: Context, stoppedBy: String) =
+            Intent(context, RingService::class.java)
+                .setAction(ACTION_STOP)
+                .putExtra(EXTRA_STOPPED_BY, stoppedBy)
+
+        private fun requestFrom(intent: Intent) = RingRequest(
+            source = intent.getStringExtra(EXTRA_SOURCE) ?: RingRequest.COMMAND,
+            scheduleId = intent.getStringExtra(EXTRA_SCHEDULE_ID),
+            commandId = intent.getStringExtra(EXTRA_COMMAND_ID),
+            durationSeconds = intent.getIntExtra(EXTRA_DURATION_SECONDS, DEFAULT_DURATION_SECONDS),
+            ringtoneId = intent.getStringExtra(EXTRA_RINGTONE_ID),
+        )
 
         private fun createChannel(context: Context) {
             val channel = NotificationChannel(

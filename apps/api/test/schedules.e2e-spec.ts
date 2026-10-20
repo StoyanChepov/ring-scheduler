@@ -207,6 +207,7 @@ describe('Schedules (HTTP)', () => {
         daysOfWeek: [6, 7],
         durationSeconds: 30,
         label: null,
+        ringtoneId: null,
       },
     ]);
 

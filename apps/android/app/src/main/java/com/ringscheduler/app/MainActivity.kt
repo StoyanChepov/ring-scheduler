@@ -69,7 +69,7 @@ class MainActivity : Activity() {
 
         findViewById<Button>(R.id.loginButton).setOnClickListener { authenticate(register = false) }
         findViewById<Button>(R.id.registerButton).setOnClickListener { authenticate(register = true) }
-        findViewById<Button>(R.id.stopButton).setOnClickListener { RingService.stop(this) }
+        findViewById<Button>(R.id.stopButton).setOnClickListener { RingService.stop(this, RingService.STOPPED_ON_PHONE) }
         findViewById<Button>(R.id.copyTokenButton).setOnClickListener { copyToken() }
         findViewById<Button>(R.id.allowAlarmScreenButton).setOnClickListener {
             startActivity(
@@ -179,9 +179,12 @@ class MainActivity : Activity() {
     }
 
     // Called on the background thread; blocks until Firebase returns the token.
-    // TODO: getToken() is deprecated in firebase-messaging 26 in favour of
-    // register() + FirebaseMessagingService.onRegistered(); migrate once the
-    // basic flow is verified on a device.
+    // getToken() is deprecated in firebase-messaging 26 in favour of
+    // register() + onRegistered(), but that API is opt-in: register() fails
+    // unless the manifest sets firebase_messaging_installation_id_enabled,
+    // which moves the app to a different registration scheme. Stay on
+    // getToken() until that scheme is the default and the Admin SDK documents
+    // sending to it.
     @Suppress("DEPRECATION")
     private fun currentFcmToken(): String {
         val token = Tasks.await(FirebaseMessaging.getInstance().token)
@@ -202,6 +205,7 @@ class MainActivity : Activity() {
     private fun syncSchedules() {
         val message = try {
             AlarmScheduler.sync(this)
+            EventReporter.flush(this)
             connectedMessage()
         } catch (e: Exception) {
             Log.w(TAG, "Schedule sync failed", e)
@@ -247,7 +251,8 @@ class MainActivity : Activity() {
 
     private fun describe(e: Exception): String = when (e) {
         is ApiException -> e.message ?: "HTTP ${e.status}"
-        is java.net.ConnectException -> "can't connect to ${serverUrl.text}. Is the API running and adb reverse set up?"
+        is java.net.ConnectException, is java.net.UnknownHostException ->
+            "can't reach ${serverUrl.text}. Check the server address and your internet connection."
         else -> e.message ?: e.javaClass.simpleName
     }
 

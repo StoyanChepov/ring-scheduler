@@ -13,7 +13,11 @@ class ApiException(val status: Int, message: String) : Exception(message)
  * [bearer] is the user's login token for the account calls, or the phone's
  * device key (`dk_...`) for the `/device` calls.
  */
-class ApiClient(private val baseUrl: String, private val bearer: String? = null) {
+class ApiClient(
+    private val baseUrl: String,
+    private val bearer: String? = null,
+    private val timeoutMs: Int = 10_000,
+) {
 
     data class AuthResult(val accessToken: String, val email: String)
 
@@ -45,6 +49,15 @@ class ApiClient(private val baseUrl: String, private val bearer: String? = null)
         request("PATCH", "/device/token", JSONObject().put("fcmToken", fcmToken))
     }
 
+    /** Uploads queued history events; the API ignores any it already has. */
+    fun reportEvents(events: JSONArray) {
+        request("POST", "/device/events", JSONObject().put("events", events))
+    }
+
+    /** The audio file of one of the owner's ringtones. */
+    fun downloadRingtone(ringtoneId: String): ByteArray =
+        sendForBytes("GET", "/device/ringtones/$ringtoneId")
+
     /** The active schedules this phone should set alarms for. */
     fun fetchSchedules(): List<Schedule> =
         Schedule.listFromJson(JSONArray(send("GET", "/device/schedules")))
@@ -65,14 +78,17 @@ class ApiClient(private val baseUrl: String, private val bearer: String? = null)
     }
 
     /** Returns the response body; throws ApiException for a non-2xx status. */
-    private fun send(method: String, path: String, body: JSONObject? = null): String {
+    private fun send(method: String, path: String, body: JSONObject? = null): String =
+        String(sendForBytes(method, path, body))
+
+    private fun sendForBytes(method: String, path: String, body: JSONObject? = null): ByteArray {
         val connection = URL(baseUrl + path).openConnection() as HttpURLConnection
 
         try {
             // Android's HttpURLConnection (unlike desktop Java's) accepts PATCH.
             connection.requestMethod = method
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
+            connection.connectTimeout = timeoutMs
+            connection.readTimeout = timeoutMs
             bearer?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
 
             if (body != null) {
@@ -83,13 +99,13 @@ class ApiClient(private val baseUrl: String, private val bearer: String? = null)
 
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
 
             if (status !in 200..299) {
-                throw ApiException(status, errorMessage(status, text))
+                throw ApiException(status, errorMessage(status, String(bytes)))
             }
 
-            return text
+            return bytes
         } finally {
             connection.disconnect()
         }

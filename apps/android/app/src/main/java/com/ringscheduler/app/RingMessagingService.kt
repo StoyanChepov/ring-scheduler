@@ -13,8 +13,24 @@ class RingMessagingService : FirebaseMessagingService() {
 
         try {
             when (data["type"]) {
-                "RING_START" -> RingService.start(this, data["durationSeconds"]?.toIntOrNull())
-                "RING_STOP" -> RingService.stop(this)
+                "RING_START" -> {
+                    val ringtoneId = data["ringtoneId"]
+                    // Fetch it now if needed, but briefly: Android only allows
+                    // starting the ring for a short while after the push.
+                    ringtoneId?.let { RingtoneStore.ensure(this, it, timeoutMs = 4_000) }
+
+                    RingService.start(
+                        this,
+                        RingRequest(
+                            source = RingRequest.COMMAND,
+                            commandId = data["commandId"],
+                            durationSeconds = data["durationSeconds"]?.toIntOrNull()
+                                ?: RingService.DEFAULT_DURATION_SECONDS,
+                            ringtoneId = ringtoneId,
+                        ),
+                    )
+                }
+                "RING_STOP" -> RingService.stop(this, RingService.STOPPED_FROM_DASHBOARD)
                 "SCHEDULES_CHANGED" -> syncSchedules()
                 else -> Log.w(TAG, "Ignoring unknown message type ${data["type"]}")
             }
@@ -31,13 +47,14 @@ class RingMessagingService : FirebaseMessagingService() {
     private fun syncSchedules() {
         try {
             AlarmScheduler.sync(this)
+            EventReporter.flush(this)
         } catch (e: Exception) {
             // The cached alarms stay set; the app syncs again when it opens.
             Log.w(TAG, "Could not sync schedules", e)
         }
     }
 
-    // Deprecated in firebase-messaging 26 (see the TODO in MainActivity).
+    // Deprecated in firebase-messaging 26; see currentFcmToken() in MainActivity.
     @Deprecated("Replaced by onRegistered in firebase-messaging 26")
     override fun onNewToken(token: String) {
         Log.i(TAG, "New FCM token: $token")

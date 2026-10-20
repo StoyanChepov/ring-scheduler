@@ -45,6 +45,7 @@ export interface RingPushPayload {
   commandId: string;
   type: 'RING_START' | 'RING_STOP';
   durationSeconds?: number;
+  ringtoneId?: string;
 }
 
 export type PushOutcome =
@@ -166,6 +167,11 @@ export class FirebaseService implements OnModuleInit {
 
     if (payload.durationSeconds !== undefined) {
       data.durationSeconds = String(payload.durationSeconds);
+    }
+
+    // The phone downloads it if it hasn't cached it yet.
+    if (payload.ringtoneId) {
+      data.ringtoneId = payload.ringtoneId;
     }
 
     return this.send(

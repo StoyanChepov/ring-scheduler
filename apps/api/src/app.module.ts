@@ -6,8 +6,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { DevicesModule } from './devices/devices.module';
+import { EventsModule } from './events/events.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RingCommandsModule } from './ring-commands/ring-commands.module';
+import { RingtonesModule } from './ringtones/ringtones.module';
 import { SchedulesModule } from './schedules/schedules.module';
 
 @Module({
@@ -19,7 +21,9 @@ import { SchedulesModule } from './schedules/schedules.module';
     PrismaModule,
     AuthModule,
     DevicesModule,
+    EventsModule,
     RingCommandsModule,
+    RingtonesModule,
     SchedulesModule,
   ],
   controllers: [AppController],

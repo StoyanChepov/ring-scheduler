@@ -4,6 +4,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { FirebaseService } from '../firebase/firebase.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RingtonesService } from '../ringtones/ringtones.service';
 import { SchedulesService } from './schedules.service';
 
 describe('SchedulesService', () => {
@@ -24,6 +25,7 @@ describe('SchedulesService', () => {
     isEnabled: true,
     sendSchedulesChanged: jest.fn(),
   };
+  const ringtones = { assertOwned: jest.fn() };
 
   const phone = { id: 'd1', platform: 'ANDROID', fcmToken: 'fcm-1' };
   const inAnHour = () => new Date(Date.now() + 3_600_000).toISOString();
@@ -47,6 +49,7 @@ describe('SchedulesService', () => {
         SchedulesService,
         { provide: PrismaService, useValue: prisma },
         { provide: FirebaseService, useValue: firebase },
+        { provide: RingtonesService, useValue: ringtones },
       ],
     }).compile();
 
@@ -100,6 +103,38 @@ describe('SchedulesService', () => {
           kind: 'ONE_TIME',
           startAt: new Date(Date.now() - 1000).toISOString(),
           durationSeconds: 30,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.ringSchedule.create).not.toHaveBeenCalled();
+    });
+
+    it('checks that a chosen ringtone belongs to the user', async () => {
+      const ringtoneId = '11111111-1111-4111-8111-111111111111';
+
+      await service.create('user-1', 'd1', {
+        kind: 'ONE_TIME',
+        startAt: inAnHour(),
+        durationSeconds: 30,
+        ringtoneId,
+      });
+
+      expect(ringtones.assertOwned).toHaveBeenCalledWith('user-1', ringtoneId);
+      expect(prisma.ringSchedule.create.mock.calls[0][0].data.ringtoneId).toBe(
+        ringtoneId,
+      );
+    });
+
+    it('refuses someone else’s ringtone before saving anything', async () => {
+      ringtones.assertOwned.mockRejectedValue(
+        new BadRequestException('Unknown ringtone'),
+      );
+
+      await expect(
+        service.create('user-1', 'd1', {
+          kind: 'ONE_TIME',
+          startAt: inAnHour(),
+          durationSeconds: 30,
+          ringtoneId: '22222222-2222-4222-8222-222222222222',
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.ringSchedule.create).not.toHaveBeenCalled();
@@ -258,6 +293,7 @@ describe('SchedulesService', () => {
           daysOfWeek: [],
           durationSeconds: 30,
           label: 'Wake up',
+          ringtoneId: null,
         },
       ]);
     });
