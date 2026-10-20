@@ -19,7 +19,19 @@ class AlarmReceiver : BroadcastReceiver() {
             Log.i(TAG, "Alarm ${schedule.id} fired (${schedule.label ?: schedule.kind})")
             // An exact alarm is allowed to start a foreground service from the
             // background, so this works with the app closed and the screen off.
-            RingService.start(context, schedule.durationSeconds)
+            try {
+                RingService.start(
+                    context,
+                    RingRequest(
+                        source = RingRequest.SCHEDULE,
+                        scheduleId = schedule.id,
+                        durationSeconds = schedule.durationSeconds,
+                    ),
+                )
+            } catch (e: IllegalStateException) {
+                // Already recorded as a failed ring; still set the next alarm.
+                Log.e(TAG, "Could not start ringing", e)
+            }
         }
 
         // Sets the next occurrence of a weekly alarm; a one-time alarm is over.

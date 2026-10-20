@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import AuthForm from './components/AuthForm.vue';
+import DeviceActivity from './components/DeviceActivity.vue';
 import DeviceSchedules from './components/DeviceSchedules.vue';
 import { useAuth } from './composables/useAuth';
 import { api } from './services/api';
@@ -218,6 +219,7 @@ onMounted(restoreSession);
           </div>
 
           <DeviceSchedules :device-id="device.id" :is-phone="device.platform === 'ANDROID'" />
+          <DeviceActivity v-if="device.platform === 'ANDROID'" :device-id="device.id" />
         </li>
       </ul>
     </section>

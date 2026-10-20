@@ -38,7 +38,7 @@ class AlarmActivity : Activity() {
 
         setContentView(R.layout.activity_alarm)
         findViewById<Button>(R.id.stopButton).setOnClickListener {
-            RingService.stop(this)
+            RingService.stop(this, RingService.STOPPED_ON_PHONE)
             finish()
         }
 

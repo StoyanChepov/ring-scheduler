@@ -45,6 +45,11 @@ class ApiClient(private val baseUrl: String, private val bearer: String? = null)
         request("PATCH", "/device/token", JSONObject().put("fcmToken", fcmToken))
     }
 
+    /** Uploads queued history events; the API ignores any it already has. */
+    fun reportEvents(events: JSONArray) {
+        request("POST", "/device/events", JSONObject().put("events", events))
+    }
+
     /** The active schedules this phone should set alarms for. */
     fun fetchSchedules(): List<Schedule> =
         Schedule.listFromJson(JSONArray(send("GET", "/device/schedules")))

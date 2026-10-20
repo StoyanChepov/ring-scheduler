@@ -69,7 +69,7 @@ class MainActivity : Activity() {
 
         findViewById<Button>(R.id.loginButton).setOnClickListener { authenticate(register = false) }
         findViewById<Button>(R.id.registerButton).setOnClickListener { authenticate(register = true) }
-        findViewById<Button>(R.id.stopButton).setOnClickListener { RingService.stop(this) }
+        findViewById<Button>(R.id.stopButton).setOnClickListener { RingService.stop(this, RingService.STOPPED_ON_PHONE) }
         findViewById<Button>(R.id.copyTokenButton).setOnClickListener { copyToken() }
         findViewById<Button>(R.id.allowAlarmScreenButton).setOnClickListener {
             startActivity(
@@ -205,6 +205,7 @@ class MainActivity : Activity() {
     private fun syncSchedules() {
         val message = try {
             AlarmScheduler.sync(this)
+            EventReporter.flush(this)
             connectedMessage()
         } catch (e: Exception) {
             Log.w(TAG, "Schedule sync failed", e)

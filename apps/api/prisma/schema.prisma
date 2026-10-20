@@ -37,6 +37,7 @@ model Device {
   lastSeenAt         DateTime?
   commands          RingCommand[]
   schedules          RingSchedule[]
+  events             AlarmEvent[]
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 }
@@ -82,4 +83,23 @@ model Ringtone {
   mimeType  String
   sizeBytes Int
   createdAt DateTime @default(now())
+}
+// What actually happened on the phone, reported by the phone itself.
+model AlarmEvent {
+  // Chosen by the phone, so a retried upload can't create duplicates.
+  id         String   @id
+  deviceId   String
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  // STARTED, FINISHED (duration ran out), STOPPED (with who in detail), FAILED
+  type       String
+  // SCHEDULE or COMMAND (a "Ring now" from the dashboard)
+  source     String
+  scheduleId String?
+  commandId  String?
+  detail     String?
+  // The phone's clock: events can be uploaded long after they happened.
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([deviceId, occurredAt])
 }

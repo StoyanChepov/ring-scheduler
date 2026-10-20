@@ -12,6 +12,7 @@ export function createFakePrisma() {
   const devices: any[] = [];
   const commands: any[] = [];
   const schedules: any[] = [];
+  const events: any[] = [];
 
   // Only the filters SchedulesService uses: deviceId, isActive and an OR of
   // { kind } / { startAt: { gt } }.
@@ -112,6 +113,36 @@ export function createFakePrisma() {
         Object.assign(command, data);
         return { ...command };
       },
+    },
+    alarmEvent: {
+      // skipDuplicates: an event with an existing id is ignored, like Postgres.
+      createMany: async ({ data }: any) => {
+        let count = 0;
+        for (const row of data) {
+          if (events.some((e) => e.id === row.id)) continue;
+          events.push({ createdAt: new Date(), ...row });
+          count++;
+        }
+        return { count };
+      },
+      deleteMany: async ({ where }: any) => {
+        const before = events.length;
+        for (let i = events.length - 1; i >= 0; i--) {
+          const e = events[i];
+          if (
+            e.deviceId === where.deviceId &&
+            e.occurredAt < where.occurredAt.lt
+          ) {
+            events.splice(i, 1);
+          }
+        }
+        return { count: before - events.length };
+      },
+      findMany: async ({ where, take }: any) =>
+        events
+          .filter((e) => e.deviceId === where.deviceId)
+          .sort((a, b) => b.occurredAt - a.occurredAt)
+          .slice(0, take),
     },
     ringSchedule: {
       findMany: async ({ where }: any) =>
