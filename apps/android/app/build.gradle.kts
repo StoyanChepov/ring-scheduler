@@ -24,8 +24,8 @@ android {
         applicationId = "com.ringscheduler.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.0.1"
 
         // What the login screen suggests; the user can still change it.
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://ring-scheduler.vercel.app\"")

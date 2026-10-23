@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { generateDeviceKey, hashDeviceKey } from '../device-auth/device-key';
+import { FirebaseService } from '../firebase/firebase.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 
@@ -8,7 +9,48 @@ const HIDE_KEY = { keyHash: true } as const;
 
 @Injectable()
 export class DevicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(DevicesService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly firebase: FirebaseService,
+  ) {}
+
+  /**
+   * Removes a device with its alarms, commands and history. Its key stops
+   * working at once. The phone is then nudged to sync: the sync is refused,
+   * and the app logs out and cancels the alarms it had cached.
+   */
+  async remove(userId: string, deviceId: string) {
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, userId },
+      select: { id: true, platform: true, fcmToken: true },
+    });
+
+    if (!device) {
+      throw new NotFoundException('Device not found');
+    }
+
+    // Schedules and commands have no cascade, so they go first; history
+    // (AlarmEvent) cascades with the device. All or nothing.
+    await this.prisma.$transaction([
+      this.prisma.ringSchedule.deleteMany({ where: { deviceId } }),
+      this.prisma.ringCommand.deleteMany({ where: { deviceId } }),
+      this.prisma.device.delete({ where: { id: deviceId } }),
+    ]);
+
+    if (device.platform !== 'ANDROID' || !device.fcmToken) return;
+    if (!this.firebase.isEnabled) return;
+
+    // Best effort: if it fails, the phone finds out the next time it opens.
+    const outcome = await this.firebase.sendSchedulesChanged(device.fcmToken);
+
+    if (outcome.status === 'failed') {
+      this.logger.warn(
+        `Could not tell removed device ${deviceId} to sign out: ${outcome.reason}`,
+      );
+    }
+  }
 
   findAll(userId: string) {
     return this.prisma.device.findMany({

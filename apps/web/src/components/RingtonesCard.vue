@@ -61,22 +61,17 @@ function kb(bytes: number) {
 
 <template>
   <section class="card">
-    <h2>Ringtones</h2>
-    <p class="muted">
-      Upload your own alarm sounds (MP3, OGG, WAV or M4A, up to 1 MB) and pick
-      them for alarms or "Ring now". Phones download them so alarms still play
-      them offline.
+    <div class="card-header">
+      <h2>Ringtones</h2>
+    </div>
+    <p class="muted small intro">
+      Your own alarm sounds, shared by all your phones: MP3, OGG, WAV or M4A, up
+      to 1 MB. Phones download them, so alarms still play them offline.
     </p>
 
     <p v-if="error" class="error">{{ error }}</p>
 
-    <form class="row" @submit.prevent="onUpload">
-      <input ref="fileInput" type="file" accept="audio/*" aria-label="Audio file" />
-      <input v-model="name" type="text" maxlength="80" placeholder="Name (optional)" class="grow" />
-      <button type="submit" :disabled="isBusy">Upload</button>
-    </form>
-
-    <ul v-if="ringtones.length" class="tone-list">
+    <ul v-if="ringtones.length" class="item-list">
       <li v-for="tone in ringtones" :key="tone.id">
         <span>
           <strong>{{ tone.name }}</strong>
@@ -98,103 +93,39 @@ function kb(bytes: number) {
       </li>
     </ul>
     <p v-else class="muted small">No ringtones yet; alarms use the phone's alarm sound.</p>
+
+    <form class="upload" @submit.prevent="onUpload">
+      <label class="field">
+        Audio file
+        <input ref="fileInput" type="file" accept="audio/*" />
+      </label>
+      <label class="field">
+        Name (optional)
+        <input v-model="name" type="text" maxlength="80" placeholder="e.g. Ship horn" />
+      </label>
+      <button type="submit" :disabled="isBusy">Upload</button>
+    </form>
   </section>
 </template>
 
 <style scoped>
-.card {
-  max-width: 900px;
-  margin: 0 auto 20px;
-  padding: 24px;
-  background: white;
-  border: 1px solid #e1e6ef;
-  border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(23, 32, 51, 0.06);
+.intro {
+  margin-bottom: 12px;
 }
 
-h2 {
-  margin-top: 0;
-  color: #172033;
-}
-
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.grow {
-  flex: 1;
-  min-width: 160px;
-}
-
-input {
-  padding: 10px 12px;
-  border: 1px solid #cfd7e6;
-  border-radius: 12px;
-  font-size: 15px;
-}
-
-button {
-  padding: 10px 16px;
-  border: 0;
-  border-radius: 12px;
-  background: #172033;
-  color: white;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-button.link {
-  padding: 4px 6px;
-  background: none;
-  color: #172033;
-}
-
-button.link.danger {
-  color: #b42318;
-}
-
-.tone-list {
+.upload {
   display: grid;
-  gap: 6px;
-  margin: 16px 0 0;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
-.tone-list li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: #f5f7fb;
-  border-radius: 10px;
-  color: #172033;
-}
-
-.muted {
-  color: #68758a;
-}
-
-.small {
-  font-size: 13px;
-}
-
-.error {
-  padding: 8px 12px;
-  background: #fdeceb;
-  border: 1px solid #f3c5c1;
-  border-radius: 10px;
-  color: #b42318;
-  font-size: 14px;
+@media (max-width: 600px) {
+  .upload {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

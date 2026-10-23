@@ -58,7 +58,21 @@ export function createFakePrisma() {
         return user;
       },
     },
+    // Each operation already ran when it was created; this just waits for
+    // them, which is enough for tests that don't exercise rollbacks.
+    $transaction: async (operations: Promise<unknown>[]) =>
+      Promise.all(operations),
     device: {
+      // Like the real cascade, history goes with the device.
+      delete: async ({ where }: any) => {
+        const index = devices.findIndex((d) => d.id === where.id);
+        if (index === -1) throw new Error('Record to delete does not exist');
+        const [device] = devices.splice(index, 1);
+        for (let i = events.length - 1; i >= 0; i--) {
+          if (events[i].deviceId === where.id) events.splice(i, 1);
+        }
+        return device;
+      },
       // Supports the ringtone lookup: devices with a schedule using a ringtone.
       findMany: async ({ where, omit, select }: any) =>
         devices
@@ -114,6 +128,13 @@ export function createFakePrisma() {
       },
     },
     ringCommand: {
+      deleteMany: async ({ where }: any) => {
+        const before = commands.length;
+        for (let i = commands.length - 1; i >= 0; i--) {
+          if (commands[i].deviceId === where.deviceId) commands.splice(i, 1);
+        }
+        return { count: before - commands.length };
+      },
       create: async ({ data }: any) => {
         const command = { id: randomUUID(), createdAt: new Date(), ...data };
         commands.push(command);
