@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -28,6 +31,15 @@ export class DevicesController {
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateDeviceDto) {
     return this.devicesService.create(user.id, dto);
+  }
+
+  @Delete(':deviceId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(
+    @CurrentUser() user: AuthUser,
+    @Param('deviceId', ParseUUIDPipe) deviceId: string,
+  ) {
+    return this.devicesService.remove(user.id, deviceId);
   }
 
   @Post(':deviceId/key')

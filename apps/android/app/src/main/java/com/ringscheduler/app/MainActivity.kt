@@ -207,6 +207,11 @@ class MainActivity : Activity() {
             AlarmScheduler.sync(this)
             EventReporter.flush(this)
             connectedMessage()
+        } catch (e: ApiException) {
+            Log.w(TAG, "Schedule sync failed", e)
+            // A 401 already signed the phone out and cancelled its alarms.
+            if (e.status == 401) "This phone was removed from your account. Log in to connect it again."
+            else "${connectedMessage()}\n(Could not refresh schedules: ${describe(e)})"
         } catch (e: Exception) {
             Log.w(TAG, "Schedule sync failed", e)
             "${connectedMessage()}\n(Could not refresh schedules: ${describe(e)})"

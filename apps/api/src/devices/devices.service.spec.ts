@@ -3,6 +3,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { hashDeviceKey } from '../device-auth/device-key';
+import { FirebaseService } from '../firebase/firebase.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DevicesService } from './devices.service';
 
@@ -23,7 +24,11 @@ describe('DevicesService', () => {
     jest.resetAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DevicesService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        DevicesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: FirebaseService, useValue: { isEnabled: false } },
+      ],
     }).compile();
 
     service = module.get(DevicesService);

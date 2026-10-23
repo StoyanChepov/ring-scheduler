@@ -26,7 +26,18 @@ object AlarmScheduler {
         val session = Session(context)
         val deviceKey = session.deviceKey ?: return emptyList()
 
-        val schedules = ApiClient(session.serverUrl, deviceKey).fetchSchedules()
+        val schedules = try {
+            ApiClient(session.serverUrl, deviceKey).fetchSchedules()
+        } catch (e: ApiException) {
+            if (e.status == 401) {
+                // The device was removed from the account (or logged in
+                // elsewhere): stop ringing on its old alarms and sign out.
+                Log.i(TAG, "Device key refused; signing out and cancelling alarms")
+                session.logout()
+                clear(context)
+            }
+            throw e
+        }
         prefs(context).edit()
             .putString(KEY_SCHEDULES, Schedule.listToJson(schedules).toString())
             .apply()

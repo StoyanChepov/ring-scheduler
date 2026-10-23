@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { lastSeen, type Device } from '../composables/useDevices';
+import { lastSeen, useDevices, type Device } from '../composables/useDevices';
 import { useRingtones } from '../composables/useRingtones';
 import { api } from '../services/api';
 import DeviceActivity from './DeviceActivity.vue';
@@ -11,6 +11,31 @@ const props = defineProps<{ device: Device }>();
 const emit = defineEmits<{ back: [] }>();
 
 const { ringtones } = useRingtones();
+const { load: reloadDevices } = useDevices();
+
+const isRemoving = ref(false);
+const removeError = ref('');
+
+async function removeDevice() {
+  const confirmed = window.confirm(
+    `Remove "${props.device.name}"? Its alarms and history are deleted, and the phone is signed out and stops ringing on them.`,
+  );
+  if (!confirmed) return;
+
+  isRemoving.value = true;
+  removeError.value = '';
+
+  try {
+    await api.delete(`/devices/${props.device.id}`);
+    await reloadDevices();
+    emit('back');
+  } catch (error) {
+    console.error(error);
+    removeError.value = 'Failed to remove the device.';
+  } finally {
+    isRemoving.value = false;
+  }
+}
 
 const ringSeconds = ref(30);
 // '' means the phone's own alarm sound.
@@ -104,6 +129,20 @@ async function send(action: 'ring' | 'stop') {
     <RingtonesCard />
 
     <DeviceActivity v-if="device.platform === 'ANDROID'" ref="activity" :device-id="device.id" />
+
+    <section class="card remove">
+      <div>
+        <h2>Remove this device</h2>
+        <p class="muted small">
+          Deletes its alarms and history. The phone is signed out and stops
+          ringing on them; logging in on it again adds it back as new.
+        </p>
+      </div>
+      <button class="danger" :disabled="isRemoving" @click="removeDevice">
+        {{ isRemoving ? 'Removing…' : 'Remove device' }}
+      </button>
+      <p v-if="removeError" class="error">{{ removeError }}</p>
+    </section>
   </div>
 </template>
 
@@ -126,6 +165,24 @@ async function send(action: 'ring' | 'stop') {
 
 .result {
   margin-top: 12px;
+}
+
+.remove {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: center;
+  justify-content: space-between;
+  border-color: var(--danger-border);
+}
+
+.remove > div {
+  flex: 1;
+  min-width: 220px;
+}
+
+.remove .error {
+  flex-basis: 100%;
 }
 
 @media (max-width: 600px) {
