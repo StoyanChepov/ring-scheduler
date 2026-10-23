@@ -37,7 +37,7 @@ function when(iso: string): string {
 async function load() {
   try {
     const response = await api.get<AlarmEvent[]>(`/devices/${props.deviceId}/events`, {
-      params: { limit: 10 },
+      params: { limit: 15 },
     });
     events.value = response.data;
     error.value = '';
@@ -60,9 +60,9 @@ defineExpose({ load });
 </script>
 
 <template>
-  <div class="activity">
-    <div class="header">
-      <h4>Recent activity</h4>
+  <section class="card">
+    <div class="card-header">
+      <h2>Recent activity</h2>
       <button class="link" type="button" @click="load">Refresh</button>
     </div>
 
@@ -71,98 +71,59 @@ defineExpose({ load });
     <ul v-if="events.length" class="event-list">
       <li v-for="event in events" :key="event.id" :class="event.type.toLowerCase()">
         <span class="badge">{{ LABELS[event.type] }}</span>
-        <span>
+        <span class="what">
           {{ event.source === 'SCHEDULE' ? 'Scheduled alarm' : 'Ring now' }}
-          <template v-if="event.detail"> · {{ event.detail }}</template>
+          <span v-if="event.detail" class="muted"> · {{ event.detail }}</span>
         </span>
-        <span class="muted time">{{ when(event.occurredAt) }}</span>
+        <span class="muted small time">{{ when(event.occurredAt) }}</span>
       </li>
     </ul>
     <p v-else class="muted small">
       Nothing yet. The phone reports here when it rings or is stopped.
     </p>
-  </div>
+  </section>
 </template>
 
 <style scoped>
-.activity {
-  flex-basis: 100%;
-  padding-top: 12px;
-  border-top: 1px solid #e1e6ef;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-h4 {
-  margin: 0 0 8px;
-  color: #172033;
-}
-
 .event-list {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
-  color: #172033;
-  font-size: 14px;
 }
 
 .event-list li {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px 10px;
   align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.event-list li:last-child {
+  border-bottom: 0;
 }
 
 .badge {
-  min-width: 64px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #e8edf6;
-  font-size: 12px;
-  font-weight: 700;
+  min-width: 76px;
   text-align: center;
 }
 
 .started .badge {
-  background: #e3f4e6;
-  color: #1b6b2c;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .failed .badge {
-  background: #fdeceb;
-  color: #b42318;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
-.time {
-  margin-left: auto;
-  font-size: 13px;
-}
-
-button.link {
-  padding: 4px 6px;
-  border: 0;
-  background: none;
-  color: #172033;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.muted {
-  color: #68758a;
-}
-
-.small {
-  font-size: 13px;
-}
-
-.error {
-  color: #b42318;
-  font-size: 14px;
+.what {
+  flex: 1;
+  min-width: 160px;
 }
 </style>

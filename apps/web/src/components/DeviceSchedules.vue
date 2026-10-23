@@ -156,57 +156,96 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="schedules">
-    <h4>Scheduled alarms</h4>
+  <section class="card">
+    <div class="card-header">
+      <h2>Scheduled alarms</h2>
+    </div>
 
     <p v-if="!isPhone" class="muted small">
-      Schedules only ring on a real Android phone; this device will just store them.
+      Schedules only ring on a real Android phone; this device just stores them.
     </p>
 
     <p v-if="error" class="error">{{ error }}</p>
 
-    <ul v-if="schedules.length" class="schedule-list">
+    <ul v-if="schedules.length" class="item-list alarms">
       <li v-for="schedule in schedules" :key="schedule.id" :class="{ paused: !schedule.isActive }">
-        <div>
+        <div class="alarm-text">
           <strong>{{ describe(schedule) }}</strong>
           <span class="muted small">
-            · {{ schedule.durationSeconds }}s · {{ nameOf(schedule.ringtoneId) }}<template v-if="schedule.label"> · {{ schedule.label }}</template>
+            {{ schedule.label ? `${schedule.label} · ` : '' }}{{ nameOf(schedule.ringtoneId) }} ·
+            {{ schedule.durationSeconds }} s
           </span>
         </div>
 
         <div class="row">
-          <label class="toggle">
+          <label class="toggle small">
             <input
               type="checkbox"
               :checked="schedule.isActive"
               :disabled="isBusy"
               @change="setActive(schedule, ($event.target as HTMLInputElement).checked)"
             />
-            On
+            {{ schedule.isActive ? 'On' : 'Off' }}
           </label>
-          <button class="link danger" :disabled="isBusy" @click="remove(schedule)">
-            Delete
-          </button>
+          <button class="link danger" :disabled="isBusy" @click="remove(schedule)">Delete</button>
         </div>
       </li>
     </ul>
-    <p v-else class="muted small">No alarms yet.</p>
+    <p v-else class="muted small">No alarms yet. Add one below.</p>
 
     <form class="add" @submit.prevent="addSchedule">
-      <div class="row">
-        <select v-model="kind" aria-label="Alarm type">
-          <option value="ONE_TIME">Once</option>
-          <option value="WEEKLY">Every week</option>
-        </select>
+      <h3 class="small">New alarm</h3>
 
-        <input
-          v-if="kind === 'ONE_TIME'"
-          v-model="startAtLocal"
-          type="datetime-local"
-          required
-          aria-label="Date and time"
-        />
-        <input v-else v-model="timeOfDay" type="time" required aria-label="Time" />
+      <div class="segmented" role="radiogroup" aria-label="Repeat">
+        <button
+          type="button"
+          role="radio"
+          :aria-checked="kind === 'ONE_TIME'"
+          :class="{ selected: kind === 'ONE_TIME' }"
+          @click="kind = 'ONE_TIME'"
+        >
+          Once
+        </button>
+        <button
+          type="button"
+          role="radio"
+          :aria-checked="kind === 'WEEKLY'"
+          :class="{ selected: kind === 'WEEKLY' }"
+          @click="kind = 'WEEKLY'"
+        >
+          Every week
+        </button>
+      </div>
+
+      <div class="fields">
+        <label v-if="kind === 'ONE_TIME'" class="field">
+          Date and time
+          <input v-model="startAtLocal" type="datetime-local" required />
+        </label>
+        <label v-else class="field">
+          Time (phone's time zone)
+          <input v-model="timeOfDay" type="time" required />
+        </label>
+
+        <label class="field">
+          Sound
+          <select v-model="ringtoneId">
+            <option value="">Phone's alarm sound</option>
+            <option v-for="tone in ringtones" :key="tone.id" :value="tone.id">
+              {{ tone.name }}
+            </option>
+          </select>
+        </label>
+
+        <label class="field">
+          Duration (seconds)
+          <input v-model="durationSeconds" type="number" min="1" max="300" />
+        </label>
+
+        <label class="field">
+          Label (optional)
+          <input v-model="label" type="text" maxlength="80" placeholder="e.g. Wake up" />
+        </label>
       </div>
 
       <div v-if="kind === 'WEEKLY'" class="row days" role="group" aria-label="Days">
@@ -223,156 +262,78 @@ onMounted(load);
         </button>
       </div>
 
-      <div class="row">
-        <input v-model="label" type="text" maxlength="80" placeholder="Label (optional)" class="grow" />
-        <input
-          v-model="durationSeconds"
-          type="number"
-          min="1"
-          max="300"
-          aria-label="Ring duration in seconds"
-          class="narrow"
-        />
-        <span class="muted small">sec</span>
-        <select v-model="ringtoneId" aria-label="Sound">
-          <option value="">Phone's alarm sound</option>
-          <option v-for="tone in ringtones" :key="tone.id" :value="tone.id">
-            {{ tone.name }}
-          </option>
-        </select>
+      <div>
         <button type="submit" :disabled="isBusy || (kind === 'WEEKLY' && days.length === 0)">
           Add alarm
         </button>
       </div>
     </form>
-  </div>
+  </section>
 </template>
 
 <style scoped>
-.schedules {
-  flex-basis: 100%;
-  padding-top: 12px;
-  border-top: 1px solid #e1e6ef;
-}
-
-h4 {
-  margin: 0 0 8px;
-  color: #172033;
-}
-
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.schedule-list {
-  display: grid;
-  gap: 6px;
-  margin: 0 0 12px;
-  padding: 0;
-  list-style: none;
-}
-
-.schedule-list li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: #f5f7fb;
-  border-radius: 10px;
-  color: #172033;
-  font-size: 15px;
-}
-
-.schedule-list li.paused {
+.alarms li.paused {
   opacity: 0.55;
 }
 
-.add {
+.alarm-text {
   display: grid;
-  gap: 8px;
-}
-
-input,
-select {
-  padding: 8px 10px;
-  border: 1px solid #cfd7e6;
-  border-radius: 10px;
-  font-size: 15px;
-}
-
-.grow {
-  flex: 1;
-  min-width: 140px;
-}
-
-.narrow {
-  width: 70px;
-}
-
-button {
-  padding: 8px 14px;
-  border: 0;
-  border-radius: 10px;
-  background: #172033;
-  color: white;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-button.day {
-  padding: 6px 10px;
-  background: #e8edf6;
-  color: #172033;
-  font-weight: 600;
-}
-
-button.day.selected {
-  background: #172033;
-  color: white;
-}
-
-button.link {
-  padding: 4px 6px;
-  background: none;
-  color: #172033;
-}
-
-button.link.danger {
-  color: #b42318;
+  min-width: 0;
 }
 
 .toggle {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
-  font-size: 14px;
 }
 
-.muted {
-  color: #68758a;
+.add {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
-.small {
-  font-size: 13px;
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.error {
-  margin: 0 0 8px;
-  padding: 8px 12px;
-  background: #fdeceb;
-  border: 1px solid #f3c5c1;
-  border-radius: 10px;
-  color: #b42318;
-  font-size: 14px;
+.segmented {
+  display: inline-flex;
+  justify-self: start;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--subtle);
+}
+
+.segmented button,
+button.day {
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--text);
+}
+
+.segmented button.selected {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(23, 32, 51, 0.15);
+}
+
+button.day {
+  min-width: 52px;
+  background: var(--subtle);
+}
+
+button.day.selected {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+@media (max-width: 600px) {
+  .fields {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

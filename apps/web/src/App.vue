@@ -1,432 +1,171 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AuthForm from './components/AuthForm.vue';
-import DeviceActivity from './components/DeviceActivity.vue';
-import DeviceSchedules from './components/DeviceSchedules.vue';
-import RingtonesCard from './components/RingtonesCard.vue';
+import DeviceDetails from './components/DeviceDetails.vue';
+import DeviceList from './components/DeviceList.vue';
 import { useAuth } from './composables/useAuth';
+import { useDevices } from './composables/useDevices';
 import { useRingtones } from './composables/useRingtones';
-import { api } from './services/api';
-
-type Device = {
-  id: string;
-  name: string;
-  platform: string;
-  fcmToken?: string | null;
-  lastSeenAt?: string | null;
-  createdAt: string;
-};
+import { APK_URL } from './links';
 
 const { user, isLoggedIn, isRestoring, restoreSession, logout } = useAuth();
+const { devices, hasLoaded, load: loadDevices, clear: clearDevices } = useDevices();
+const { load: loadRingtones, clear: clearRingtones } = useRingtones();
 
-const devices = ref<Device[]>([]);
-const newDeviceName = ref('Mock Android Phone');
-// Always the newest GitHub release's APK.
-const APK_URL =
-  'https://github.com/StoyanChepov/ring-scheduler/releases/latest/download/ring-scheduler.apk';
-
-const ringSeconds = ref(30);
-// '' means the phone's own alarm sound.
-const ringRingtoneId = ref('');
-const { ringtones, load: loadRingtones, clear: clearRingtones } = useRingtones();
-const isLoading = ref(false);
-const message = ref('');
-const messageIsError = ref(false);
-
-type Delivery = {
-  mode: 'mock' | 'fcm';
-  delivered: boolean;
-  message: string;
-};
-
-function showDelivery(delivery: Delivery | undefined, fallback: string) {
-  message.value = delivery?.message ?? fallback;
-  // A command can be saved but still fail to reach the device.
-  messageIsError.value = delivery ? !delivery.delivered : false;
+// The open device lives in the URL (#/devices/<id>), so the browser's back
+// button and a page refresh both work without a router.
+function deviceIdFromHash(): string | null {
+  return /^#\/devices\/([0-9a-f-]{36})$/i.exec(window.location.hash)?.[1] ?? null;
 }
 
-async function loadDevices() {
-  isLoading.value = true;
-  message.value = '';
+const openDeviceId = ref(deviceIdFromHash());
+const onHashChange = () => (openDeviceId.value = deviceIdFromHash());
 
-  try {
-    const response = await api.get<Device[]>('/devices');
-    devices.value = response.data;
-  } catch (error) {
-    console.error(error);
-    message.value = 'Failed to load devices.';
-    messageIsError.value = true;
-  } finally {
-    isLoading.value = false;
-  }
+const openDevice = computed(
+  () => devices.value.find((device) => device.id === openDeviceId.value) ?? null,
+);
+
+function showDevice(deviceId: string) {
+  window.location.hash = `#/devices/${deviceId}`;
 }
 
-async function createDevice() {
-  if (!newDeviceName.value.trim()) {
-    message.value = 'Device name is required.';
-    messageIsError.value = true;
-    return;
-  }
-
-  isLoading.value = true;
-  message.value = '';
-
-  try {
-    await api.post('/devices', {
-      name: newDeviceName.value,
-      platform: 'MOCK',
-    });
-
-    newDeviceName.value = '';
-    message.value = 'Device created.';
-    messageIsError.value = false;
-    await loadDevices();
-  } catch (error) {
-    console.error(error);
-    message.value = 'Failed to create device.';
-    messageIsError.value = true;
-  } finally {
-    isLoading.value = false;
-  }
+function showList() {
+  // Clears the hash without leaving a bare "#" behind.
+  history.pushState(null, '', window.location.pathname + window.location.search);
+  openDeviceId.value = null;
 }
 
-async function ringDevice(device: Device) {
-  isLoading.value = true;
-  message.value = '';
-
-  try {
-    const response = await api.post(`/devices/${device.id}/ring`, {
-      durationSeconds: Number(ringSeconds.value),
-      ...(ringRingtoneId.value && { ringtoneId: ringRingtoneId.value }),
-    });
-
-    showDelivery(response.data?.delivery, `Ring command sent to ${device.name}.`);
-  } catch (error) {
-    console.error(error);
-    message.value = `Failed to ring ${device.name}.`;
-    messageIsError.value = true;
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-async function stopDevice(device: Device) {
-  isLoading.value = true;
-  message.value = '';
-
-  try {
-    const response = await api.post(`/devices/${device.id}/stop`);
-
-    showDelivery(response.data?.delivery, `Stop command sent to ${device.name}.`);
-  } catch (error) {
-    console.error(error);
-    message.value = `Failed to stop ${device.name}.`;
-    messageIsError.value = true;
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-// Load the user's devices on login; drop them on logout so the next person
-// to log in on this browser never sees stale data.
+// Load on login; drop everything on logout so the next person to log in on
+// this browser never sees stale data.
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) {
     loadDevices();
     loadRingtones().catch((error) => console.error(error));
   } else {
-    devices.value = [];
-    message.value = '';
-    ringRingtoneId.value = '';
+    clearDevices();
     clearRingtones();
   }
 });
 
-onMounted(restoreSession);
+onMounted(() => {
+  window.addEventListener('hashchange', onHashChange);
+  window.addEventListener('popstate', onHashChange);
+  restoreSession();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('hashchange', onHashChange);
+  window.removeEventListener('popstate', onHashChange);
+});
 </script>
 
 <template>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#" @click.prevent="showList">
+        <img src="/favicon.svg" alt="" width="28" height="28" />
+        Ring Scheduler
+      </a>
+
+      <div v-if="isLoggedIn" class="row user">
+        <span class="muted small email">{{ user?.email }}</span>
+        <button class="secondary" @click="logout">Log out</button>
+      </div>
+    </div>
+  </header>
+
   <main class="page">
-    <section class="hero">
-      <p class="eyebrow">RingScheduler</p>
-      <h1>Remote device ringing dashboard</h1>
-      <p class="subtitle">
-        Ring your devices now, or schedule alarms that ring even when the phone is offline.
-      </p>
-      <a class="download" :href="APK_URL">Get the Android app</a>
-      <span class="muted download-note">Android 8 or newer · install the APK, then log in with the same account</span>
-    </section>
+    <p v-if="isRestoring" class="muted">Restoring your session…</p>
 
-    <p v-if="isRestoring" class="muted session-note">Restoring your session...</p>
-
-    <AuthForm v-else-if="!isLoggedIn" />
+    <div v-else-if="!isLoggedIn" class="welcome">
+      <div class="intro stack">
+        <h1>Alarms for your Android phones</h1>
+        <p class="muted">
+          Ring a phone right now, or schedule alarms that ring on time even when
+          the phone is offline. Use your own ringtones and see what happened on
+          each phone.
+        </p>
+        <p class="row">
+          <a class="button secondary" :href="APK_URL">Get the Android app</a>
+          <span class="muted small">Android 8 or newer</span>
+        </p>
+      </div>
+      <AuthForm />
+    </div>
 
     <template v-else>
-    <section class="card user-bar">
-      <span>Signed in as <strong>{{ user?.email }}</strong></span>
-      <button class="secondary" @click="logout">Log out</button>
-    </section>
+      <DeviceDetails v-if="openDevice" :key="openDevice.id" :device="openDevice" @back="showList" />
 
-    <section class="card">
-      <h2>Add mock device</h2>
+      <section v-else-if="openDeviceId && hasLoaded" class="card stack">
+        <p>That device isn't in your account (any more).</p>
+        <p><button class="secondary" @click="showList">Show all devices</button></p>
+      </section>
 
-      <div class="form-row">
-        <input
-          v-model="newDeviceName"
-          type="text"
-          placeholder="Device name"
-          @keyup.enter="createDevice"
-        />
-
-        <button :disabled="isLoading" @click="createDevice">
-          Add device
-        </button>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="section-header">
-        <h2>Devices</h2>
-
-        <button class="secondary" :disabled="isLoading" @click="loadDevices">
-          Refresh
-        </button>
-      </div>
-
-      <div class="duration-row">
-        <label for="duration">Ring duration</label>
-        <input
-          id="duration"
-          v-model="ringSeconds"
-          type="number"
-          min="1"
-          max="300"
-        />
-        <span>seconds</span>
-
-        <label for="ring-sound">Sound</label>
-        <select id="ring-sound" v-model="ringRingtoneId">
-          <option value="">Phone's alarm sound</option>
-          <option v-for="tone in ringtones" :key="tone.id" :value="tone.id">
-            {{ tone.name }}
-          </option>
-        </select>
-      </div>
-
-      <p v-if="message" class="message" :class="{ error: messageIsError }">
-        {{ message }}
-      </p>
-
-      <p v-if="isLoading" class="muted">
-        Loading...
-      </p>
-
-      <p v-if="!isLoading && devices.length === 0" class="muted">
-        No devices yet. Add your first mock device above.
-      </p>
-
-      <ul class="device-list">
-        <li v-for="device in devices" :key="device.id" class="device-card">
-          <div>
-            <h3>{{ device.name }}</h3>
-            <p>{{ device.platform }} · {{ device.id }}</p>
-          </div>
-
-          <div class="actions">
-            <button :disabled="isLoading" @click="ringDevice(device)">
-              Ring
-            </button>
-
-            <button class="danger" :disabled="isLoading" @click="stopDevice(device)">
-              Stop
-            </button>
-          </div>
-
-          <DeviceSchedules :device-id="device.id" :is-phone="device.platform === 'ANDROID'" />
-          <DeviceActivity v-if="device.platform === 'ANDROID'" :device-id="device.id" />
-        </li>
-      </ul>
-    </section>
-
-    <RingtonesCard />
+      <DeviceList v-else @open="showDevice" />
     </template>
   </main>
 </template>
 
 <style scoped>
-.page {
-  min-height: 100vh;
-  padding: 48px 24px;
-  background: #f5f7fb;
-  color: #172033;
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
-.hero {
-  max-width: 900px;
-  margin: 0 auto 24px;
+.topbar-inner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 12px 16px;
 }
 
-.eyebrow {
-  margin: 0 0 8px;
-  color: #52627a;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-h1 {
-  margin: 0;
-  font-size: 42px;
-  line-height: 1.1;
-}
-
-.subtitle {
-  max-width: 680px;
-  color: #52627a;
-  font-size: 18px;
-}
-
-.download {
-  display: inline-block;
-  margin-right: 12px;
-  padding: 12px 18px;
-  border-radius: 12px;
-  background: #172033;
-  color: white;
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--text);
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
 }
 
-.download-note {
-  font-size: 14px;
+.user button {
+  white-space: nowrap;
 }
 
-.card {
-  max-width: 900px;
-  margin: 0 auto 20px;
-  padding: 24px;
-  background: white;
-  border: 1px solid #e1e6ef;
-  border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(23, 32, 51, 0.06);
+.user {
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
-.session-note {
-  max-width: 900px;
-  margin: 0 auto;
+.email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.user-bar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.section-header,
-.form-row,
-.duration-row,
-.device-card,
-.actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.section-header,
-.device-card {
-  justify-content: space-between;
-}
-
-.form-row input {
-  flex: 1;
-}
-
-input {
-  padding: 12px 14px;
-  border: 1px solid #cfd7e6;
-  border-radius: 12px;
-  font-size: 15px;
-}
-
-.duration-row {
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-select {
-  padding: 12px 14px;
-  border: 1px solid #cfd7e6;
-  border-radius: 12px;
-  font-size: 15px;
-}
-
-.duration-row input {
-  width: 90px;
-}
-
-button {
-  padding: 12px 16px;
-  border: 0;
-  border-radius: 12px;
-  background: #172033;
-  color: white;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-button.secondary {
-  background: #e8edf6;
-  color: #172033;
-}
-
-button.danger {
-  background: #b42318;
-}
-
-.message {
-  padding: 12px 14px;
-  background: #eef7ee;
-  border: 1px solid #cde8cd;
-  border-radius: 12px;
-}
-
-.message.error {
-  background: #fdeceb;
-  border-color: #f3c5c1;
-  color: #b42318;
-}
-
-.muted {
-  color: #68758a;
-}
-
-.device-list {
+.welcome {
   display: grid;
-  gap: 12px;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+  gap: 32px;
+  align-items: start;
+  padding-top: 24px;
 }
 
-.device-card {
-  flex-wrap: wrap;
-  padding: 16px;
-  border: 1px solid #e1e6ef;
-  border-radius: 14px;
+@media (max-width: 760px) {
+  .welcome {
+    grid-template-columns: 1fr;
+  }
 }
 
-.device-card h3 {
-  margin: 0 0 6px;
-}
-
-.device-card p {
-  margin: 0;
-  color: #68758a;
-  font-size: 13px;
-  word-break: break-all;
+/* The email is also in the account the user just logged into; on a phone the
+   space is better spent on the brand and the button. */
+@media (max-width: 480px) {
+  .email {
+    display: none;
+  }
 }
 </style>

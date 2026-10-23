@@ -45,7 +45,7 @@ async function play(id: string) {
 }
 
 function nameOf(id: string | null | undefined): string {
-  if (!id) return 'Default alarm sound';
+  if (!id) return "Phone's alarm sound";
   return ringtones.value.find((r) => r.id === id)?.name ?? 'Ringtone';
 }
 

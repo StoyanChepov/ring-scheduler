@@ -56,7 +56,7 @@ function toggleMode() {
 </script>
 
 <template>
-  <section class="card auth-card">
+  <section class="card">
     <h2>{{ isRegister ? 'Create account' : 'Log in' }}</h2>
 
     <form class="auth-form" @submit.prevent="submit">
@@ -95,13 +95,10 @@ function toggleMode() {
 </template>
 
 <style scoped>
-.auth-card {
-  max-width: 420px;
-}
-
 .auth-form {
   display: grid;
   gap: 16px;
+  margin-top: 12px;
 }
 
 label {
@@ -111,29 +108,18 @@ label {
 }
 
 .hint {
-  color: #68758a;
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 400;
 }
 
-.error {
-  margin: 0;
-  padding: 12px 14px;
-  background: #fdeceb;
-  border: 1px solid #f3c5c1;
-  border-radius: 12px;
-  color: #b42318;
-}
-
 .switch {
-  margin: 16px 0 0;
-  color: #52627a;
+  margin-top: 16px;
+  color: var(--text-muted);
 }
 
 button.link {
   padding: 0;
-  background: none;
-  color: #172033;
   text-decoration: underline;
 }
 </style>
