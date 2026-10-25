@@ -272,16 +272,9 @@ onMounted(load);
 </template>
 
 <style scoped>
-/* Each alarm is its own bordered row, like the device list, so neighbours
-   don't run together. The bar on the left shows at a glance whether it's on. */
-.alarms {
-  gap: 10px;
-}
-
+/* The bar on the left shows at a glance whether an alarm is on. */
 .alarms > li {
-  padding: 14px 16px 14px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  padding-left: 14px;
   border-left: 4px solid var(--primary);
 }
 

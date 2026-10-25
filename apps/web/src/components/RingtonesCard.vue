@@ -73,7 +73,7 @@ function kb(bytes: number) {
 
     <ul v-if="ringtones.length" class="item-list">
       <li v-for="tone in ringtones" :key="tone.id">
-        <span>
+        <span class="tone-name">
           <strong>{{ tone.name }}</strong>
           <span class="muted small"> · {{ kb(tone.sizeBytes) }}</span>
         </span>
@@ -111,6 +111,12 @@ function kb(bytes: number) {
 <style scoped>
 .intro {
   margin-bottom: 12px;
+}
+
+/* A long file name wraps instead of pushing the buttons out of the row. */
+.tone-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .upload {

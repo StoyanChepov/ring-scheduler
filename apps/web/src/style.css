@@ -215,11 +215,12 @@ a:focus-visible {
   font-weight: 600;
 }
 
-/* Lists of items inside a card */
+/* Lists of items inside a card: each item is its own bordered row, like the
+   device list, so neighbours don't run together. */
 
 .item-list {
   display: grid;
-  gap: 6px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -231,7 +232,8 @@ a:focus-visible {
   gap: 8px;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  background: var(--surface-muted);
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
