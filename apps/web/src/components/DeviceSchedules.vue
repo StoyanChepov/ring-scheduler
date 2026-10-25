@@ -272,12 +272,30 @@ onMounted(load);
 </template>
 
 <style scoped>
-.alarms li.paused {
+/* Each alarm is its own bordered row, like the device list, so neighbours
+   don't run together. The bar on the left shows at a glance whether it's on. */
+.alarms {
+  gap: 10px;
+}
+
+.alarms > li {
+  padding: 14px 16px 14px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+}
+
+.alarms > li.paused {
+  border-left-color: var(--border-strong);
+}
+
+.alarms li.paused .alarm-text {
   opacity: 0.55;
 }
 
 .alarm-text {
   display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
