@@ -31,6 +31,17 @@ describe('AppController (e2e)', () => {
       .expect('Hello World!');
   });
 
+  it('/health and /health/db (GET) need no login', async () => {
+    await request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect({ status: 'ok' });
+    await request(app.getHttpServer())
+      .get('/health/db')
+      .expect(200)
+      .expect({ status: 'ok', database: 'ok' });
+  });
+
   afterEach(async () => {
     await app.close();
   });
