@@ -272,12 +272,23 @@ onMounted(load);
 </template>
 
 <style scoped>
-.alarms li.paused {
+/* The bar on the left shows at a glance whether an alarm is on. */
+.alarms > li {
+  padding-left: 14px;
+  border-left: 4px solid var(--primary);
+}
+
+.alarms > li.paused {
+  border-left-color: var(--border-strong);
+}
+
+.alarms li.paused .alarm-text {
   opacity: 0.55;
 }
 
 .alarm-text {
   display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
