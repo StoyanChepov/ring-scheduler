@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DevicesService } from './devices.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceTokenDto } from './dto/update-device-token.dto';
+import { UpdateDeviceDto } from './dto/update-device.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('devices')
@@ -31,6 +32,15 @@ export class DevicesController {
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateDeviceDto) {
     return this.devicesService.create(user.id, dto);
+  }
+
+  @Patch(':deviceId')
+  rename(
+    @CurrentUser() user: AuthUser,
+    @Param('deviceId', ParseUUIDPipe) deviceId: string,
+    @Body() dto: UpdateDeviceDto,
+  ) {
+    return this.devicesService.rename(user.id, deviceId, dto.name);
   }
 
   @Delete(':deviceId')

@@ -38,6 +38,13 @@ function clear() {
   error.value = '';
 }
 
+async function rename(deviceId: string, name: string) {
+  const response = await api.patch<Device>(`/devices/${deviceId}`, { name });
+  devices.value = devices.value.map((device) =>
+    device.id === deviceId ? response.data : device,
+  );
+}
+
 /** "5 min ago"-style text for when the phone last talked to the server. */
 export function lastSeen(device: Device): string {
   if (!device.lastSeenAt) return 'Never connected';
@@ -59,5 +66,5 @@ export function lastSeen(device: Device): string {
 }
 
 export function useDevices() {
-  return { devices, isLoading, hasLoaded, error, load, clear };
+  return { devices, isLoading, hasLoaded, error, load, clear, rename };
 }

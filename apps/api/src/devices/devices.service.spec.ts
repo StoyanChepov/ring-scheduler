@@ -86,6 +86,34 @@ describe('DevicesService', () => {
     });
   });
 
+  describe('rename', () => {
+    it('renames only a device the user owns, without its key hash', async () => {
+      prisma.device.updateMany.mockResolvedValue({ count: 1 });
+      prisma.device.findFirst.mockResolvedValue({ id: 'd1', name: 'Kitchen' });
+
+      const result = await service.rename('user-1', 'd1', 'Kitchen');
+
+      expect(prisma.device.updateMany).toHaveBeenCalledWith({
+        where: { id: 'd1', userId: 'user-1' },
+        data: { name: 'Kitchen' },
+      });
+      expect(prisma.device.findFirst).toHaveBeenCalledWith({
+        where: { id: 'd1', userId: 'user-1' },
+        omit: { keyHash: true },
+      });
+      expect(result).toEqual({ id: 'd1', name: 'Kitchen' });
+    });
+
+    it('reports 404 for a device that is missing or belongs to someone else', async () => {
+      prisma.device.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.rename('user-1', 'not-mine', 'Kitchen'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.device.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
   it('defaults the platform to MOCK', async () => {
     prisma.device.create.mockResolvedValue({ id: 'd1' });
 

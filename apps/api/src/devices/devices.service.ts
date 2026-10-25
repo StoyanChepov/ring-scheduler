@@ -83,6 +83,24 @@ export class DevicesService {
     return deviceKey ? { ...device, deviceKey } : device;
   }
 
+  // Only the dashboard shows the name; the phone sends it once, when it is
+  // added, and never reads it back.
+  async rename(userId: string, deviceId: string, name: string) {
+    const { count } = await this.prisma.device.updateMany({
+      where: { id: deviceId, userId },
+      data: { name },
+    });
+
+    if (count === 0) {
+      throw new NotFoundException('Device not found');
+    }
+
+    return this.prisma.device.findFirst({
+      where: { id: deviceId, userId },
+      omit: HIDE_KEY,
+    });
+  }
+
   /**
    * Replaces the device's key, e.g. when the owner logs in again on the phone.
    * The old key stops working immediately.

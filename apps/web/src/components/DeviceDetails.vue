@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { lastSeen, useDevices, type Device } from '../composables/useDevices';
 import { useRingtones } from '../composables/useRingtones';
 import { api } from '../services/api';
@@ -11,7 +11,43 @@ const props = defineProps<{ device: Device }>();
 const emit = defineEmits<{ back: [] }>();
 
 const { ringtones } = useRingtones();
-const { load: reloadDevices } = useDevices();
+const { load: reloadDevices, rename } = useDevices();
+
+const isRenaming = ref(false);
+const isSavingName = ref(false);
+const newName = ref('');
+const renameError = ref('');
+const nameInput = ref<HTMLInputElement | null>(null);
+
+async function startRename() {
+  newName.value = props.device.name;
+  renameError.value = '';
+  isRenaming.value = true;
+  await nextTick();
+  nameInput.value?.select();
+}
+
+async function saveName() {
+  const name = newName.value.trim();
+  if (!name) return;
+  if (name === props.device.name) {
+    isRenaming.value = false;
+    return;
+  }
+
+  isSavingName.value = true;
+  renameError.value = '';
+
+  try {
+    await rename(props.device.id, name);
+    isRenaming.value = false;
+  } catch (error) {
+    console.error(error);
+    renameError.value = 'Failed to rename the device.';
+  } finally {
+    isSavingName.value = false;
+  }
+}
 
 const isRemoving = ref(false);
 const removeError = ref('');
@@ -85,7 +121,26 @@ async function send(action: 'ring' | 'stop') {
   <div class="stack">
     <div>
       <button class="link back" type="button" @click="emit('back')">‹ All devices</button>
-      <h1>{{ device.name }}</h1>
+
+      <form v-if="isRenaming" class="rename" @submit.prevent="saveName">
+        <input
+          ref="nameInput"
+          v-model="newName"
+          aria-label="Device name"
+          maxlength="80"
+          required
+          @keydown.esc="isRenaming = false"
+        />
+        <button type="submit" :disabled="isSavingName || !newName.trim()">Save</button>
+        <button class="secondary" type="button" @click="isRenaming = false">Cancel</button>
+      </form>
+
+      <div v-else class="title">
+        <h1>{{ device.name }}</h1>
+        <button class="link" type="button" @click="startRename">Rename</button>
+      </div>
+
+      <p v-if="renameError" class="error" role="alert">{{ renameError }}</p>
       <p class="muted small">
         {{ device.platform === 'ANDROID' ? 'Android phone' : 'Test device' }}
         · {{ lastSeen(device) }}
@@ -150,6 +205,37 @@ async function send(action: 'ring' | 'stop') {
 .back {
   margin: 0 0 8px -6px;
   color: var(--text-muted);
+}
+
+.title {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.title h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.title .link {
+  flex: none;
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
+.rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.rename input {
+  flex: 1;
+  min-width: 200px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .ring-form {

@@ -4,8 +4,9 @@ The dashboard where users see their phones, ring them, schedule alarms,
 upload ringtones and check what happened on each phone.
 
 Built with **Vue 3 + TypeScript + Vite**. State is kept in a few plain
-composables (no Vuex/Pinia), and there is no router: the open device lives in
-the URL hash (`#/devices/<id>`), so back, refresh and links still work.
+composables (no Vuex/Pinia), and there is no router: the open page lives in
+the URL hash (`#/devices/<id>` or `#/account`), so back, refresh and links
+still work.
 
 ## Run locally
 
@@ -54,16 +55,19 @@ fails with "vue-tsc: command not found".
 
 ## Layout
 
-- `src/App.vue`: the shell: top bar, then login, the device list, or one
-  device's details, depending on the session and the URL.
+- `src/App.vue`: the shell: top bar, then login, the device list, one
+  device's details, or the account page, depending on the session and the
+  URL.
 - `src/components/`
   - `DeviceList.vue`: the user's phones.
-  - `DeviceDetails.vue`: one phone: Ring now, plus the sections below.
+  - `DeviceDetails.vue`: one phone: rename, Ring now, the sections below,
+    and remove.
   - `DeviceSchedules.vue`: scheduled alarms and the new-alarm form.
   - `RingtonesCard.vue`: upload, play and delete ringtones (shared by all
     of the user's phones).
   - `DeviceActivity.vue`: what the phone reported (rang, stopped, failed).
   - `AuthForm.vue`: log in / create account.
+  - `AccountSettings.vue`: change password, delete the account.
 - `src/composables/`: `useAuth`, `useDevices`, `useRingtones` (page-wide
   shared state).
 - `src/services/api.ts`: the axios client; adds the login token and logs out

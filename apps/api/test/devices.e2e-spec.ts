@@ -9,7 +9,7 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { createFakePrisma } from './helpers/fake-prisma';
 
-describe('Removing a device (HTTP)', () => {
+describe('Renaming and removing a device (HTTP)', () => {
   let app: INestApplication<App>;
   let http: ReturnType<typeof request>;
 
@@ -113,6 +113,47 @@ describe('Removing a device (HTTP)', () => {
       .expect(401);
     // Removing it again is a 404, not an error.
     await http.delete(`/devices/${phone.id}`).set(bearer(token)).expect(404);
+  });
+
+  it('renames a device, trimming the name', async () => {
+    const { token, phone } = await setup('rename@example.com');
+
+    const renamed = await http
+      .patch(`/devices/${phone.id}`)
+      .set(bearer(token))
+      .send({ name: '  Kitchen phone  ' })
+      .expect(200);
+
+    expect(renamed.body.name).toBe('Kitchen phone');
+    expect(renamed.body).not.toHaveProperty('keyHash');
+
+    const list = await http.get('/devices').set(bearer(token)).expect(200);
+    expect(list.body[0].name).toBe('Kitchen phone');
+  });
+
+  it('refuses blank or long names, and other users', async () => {
+    const owner = await setup('rename-owner@example.com');
+    const other = await setup('rename-other@example.com');
+    const rename = (token: string, name: unknown) =>
+      http
+        .patch(`/devices/${owner.phone.id}`)
+        .set(bearer(token))
+        .send({ name });
+
+    await rename(owner.token, '   ').expect(400);
+    await rename(owner.token, 'x'.repeat(81)).expect(400);
+    await rename(owner.token, 42).expect(400);
+    await rename(other.token, 'Mine now').expect(404);
+    await http
+      .patch(`/devices/${owner.phone.id}`)
+      .send({ name: 'No token' })
+      .expect(401);
+
+    const list = await http
+      .get('/devices')
+      .set(bearer(owner.token))
+      .expect(200);
+    expect(list.body[0].name).toBe('Phone');
   });
 
   it('only lets the owner remove a device', async () => {
