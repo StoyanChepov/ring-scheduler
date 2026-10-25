@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import AccountSettings from './components/AccountSettings.vue';
 import AuthForm from './components/AuthForm.vue';
 import DeviceDetails from './components/DeviceDetails.vue';
 import DeviceList from './components/DeviceList.vue';
@@ -12,14 +13,20 @@ const { user, isLoggedIn, isRestoring, restoreSession, logout } = useAuth();
 const { devices, hasLoaded, load: loadDevices, clear: clearDevices } = useDevices();
 const { load: loadRingtones, clear: clearRingtones } = useRingtones();
 
-// The open device lives in the URL (#/devices/<id>), so the browser's back
-// button and a page refresh both work without a router.
+// The open page lives in the URL (#/devices/<id> or #/account), so the
+// browser's back button and a page refresh both work without a router.
 function deviceIdFromHash(): string | null {
   return /^#\/devices\/([0-9a-f-]{36})$/i.exec(window.location.hash)?.[1] ?? null;
 }
 
+const isAccountHash = () => window.location.hash === '#/account';
+
 const openDeviceId = ref(deviceIdFromHash());
-const onHashChange = () => (openDeviceId.value = deviceIdFromHash());
+const isAccountOpen = ref(isAccountHash());
+const onHashChange = () => {
+  openDeviceId.value = deviceIdFromHash();
+  isAccountOpen.value = isAccountHash();
+};
 
 const openDevice = computed(
   () => devices.value.find((device) => device.id === openDeviceId.value) ?? null,
@@ -33,6 +40,7 @@ function showList() {
   // Clears the hash without leaving a bare "#" behind.
   history.pushState(null, '', window.location.pathname + window.location.search);
   openDeviceId.value = null;
+  isAccountOpen.value = false;
 }
 
 // Load on login; drop everything on logout so the next person to log in on
@@ -69,6 +77,7 @@ onBeforeUnmount(() => {
 
       <div v-if="isLoggedIn" class="row user">
         <span class="muted small email">{{ user?.email }}</span>
+        <a class="button secondary" href="#/account">Account</a>
         <button class="secondary" @click="logout">Log out</button>
       </div>
     </div>
@@ -94,7 +103,9 @@ onBeforeUnmount(() => {
     </div>
 
     <template v-else>
-      <DeviceDetails v-if="openDevice" :key="openDevice.id" :device="openDevice" @back="showList" />
+      <AccountSettings v-if="isAccountOpen" @back="showList" />
+
+      <DeviceDetails v-else-if="openDevice" :key="openDevice.id" :device="openDevice" @back="showList" />
 
       <section v-else-if="openDeviceId && hasLoaded" class="card stack">
         <p>That device isn't in your account (any more).</p>
@@ -132,7 +143,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.user button {
+.user button,
+.user .button {
   white-space: nowrap;
 }
 
@@ -166,6 +178,12 @@ onBeforeUnmount(() => {
 @media (max-width: 480px) {
   .email {
     display: none;
+  }
+
+  /* Brand and both buttons still fit on one line at 375 px. */
+  .user button,
+  .user .button {
+    padding: 8px 10px;
   }
 }
 </style>

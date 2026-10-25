@@ -46,6 +46,21 @@ async function authenticate(path: '/auth/login' | '/auth/register', email: strin
   user.value = response.data.user;
 }
 
+function logout() {
+  clearToken();
+  reset();
+}
+
+async function changePassword(currentPassword: string, newPassword: string) {
+  await api.patch('/auth/password', { currentPassword, newPassword });
+}
+
+// Everything in the account goes with it, so the session ends here too.
+async function deleteAccount(password: string) {
+  await api.delete('/auth/me', { data: { password } });
+  logout();
+}
+
 export function useAuth() {
   return {
     user,
@@ -54,9 +69,8 @@ export function useAuth() {
     restoreSession,
     login: (email: string, password: string) => authenticate('/auth/login', email, password),
     register: (email: string, password: string) => authenticate('/auth/register', email, password),
-    logout() {
-      clearToken();
-      reset();
-    },
+    logout,
+    changePassword,
+    deleteAccount,
   };
 }

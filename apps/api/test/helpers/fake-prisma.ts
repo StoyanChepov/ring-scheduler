@@ -15,11 +15,19 @@ export function createFakePrisma() {
   const events: any[] = [];
   const ringtones: any[] = [];
 
+  // A relation filter such as { device: { userId } }: the row's device
+  // belongs to that user.
+  const ownedBy = (deviceId: string, device: any) =>
+    device === undefined ||
+    devices.some((d) => d.id === deviceId && d.userId === device.userId);
+
   // Only the filters SchedulesService uses: deviceId, isActive and an OR of
-  // { kind } / { startAt: { gt } }.
+  // { kind } / { startAt: { gt } }; plus { device: { userId } } for deleting
+  // an account.
   const matchesSchedule = (s: any, where: any) =>
     (where.id === undefined || s.id === where.id) &&
     (where.deviceId === undefined || s.deviceId === where.deviceId) &&
+    ownedBy(s.deviceId, where.device) &&
     (where.isActive === undefined || s.isActive === where.isActive) &&
     (where.OR === undefined ||
       where.OR.some((clause: any) =>
@@ -57,12 +65,44 @@ export function createFakePrisma() {
         users.push(user);
         return user;
       },
+      update: async ({ where, data }: any) => {
+        const user = users.find((u) => u.id === where.id);
+        if (!user) throw new Error('Record to update not found');
+        Object.assign(user, data);
+        return user;
+      },
+      // Like the real foreign keys, it fails while the user still owns rows.
+      delete: async ({ where }: any) => {
+        if (
+          devices.some((d) => d.userId === where.id) ||
+          ringtones.some((r) => r.userId === where.id)
+        ) {
+          throw new Error('Foreign key constraint violated');
+        }
+        const index = users.findIndex((u) => u.id === where.id);
+        if (index === -1) throw new Error('Record to delete does not exist');
+        return users.splice(index, 1)[0];
+      },
     },
     // Each operation already ran when it was created; this just waits for
     // them, which is enough for tests that don't exercise rollbacks.
     $transaction: async (operations: Promise<unknown>[]) =>
       Promise.all(operations),
+    $queryRaw: async () => [{ '?column?': 1 }],
     device: {
+      // Like the real cascade, history goes with the devices.
+      deleteMany: async ({ where }: any) => {
+        const gone = new Set(
+          devices.filter((d) => d.userId === where.userId).map((d) => d.id),
+        );
+        for (let i = devices.length - 1; i >= 0; i--) {
+          if (gone.has(devices[i].id)) devices.splice(i, 1);
+        }
+        for (let i = events.length - 1; i >= 0; i--) {
+          if (gone.has(events[i].deviceId)) events.splice(i, 1);
+        }
+        return { count: gone.size };
+      },
       // Like the real cascade, history goes with the device.
       delete: async ({ where }: any) => {
         const index = devices.findIndex((d) => d.id === where.id);
@@ -131,7 +171,13 @@ export function createFakePrisma() {
       deleteMany: async ({ where }: any) => {
         const before = commands.length;
         for (let i = commands.length - 1; i >= 0; i--) {
-          if (commands[i].deviceId === where.deviceId) commands.splice(i, 1);
+          const c = commands[i];
+          if (
+            (where.deviceId === undefined || c.deviceId === where.deviceId) &&
+            ownedBy(c.deviceId, where.device)
+          ) {
+            commands.splice(i, 1);
+          }
         }
         return { count: before - commands.length };
       },
@@ -197,16 +243,18 @@ export function createFakePrisma() {
           select,
         ),
       // Like the real foreign key: schedules using it fall back to null.
+      // Without an id, all of the user's ringtones go.
       deleteMany: async ({ where }: any) => {
-        const index = ringtones.findIndex(
-          (r) => r.id === where.id && r.userId === where.userId,
+        const gone = ringtones.filter(
+          (r) =>
+            (where.id === undefined || r.id === where.id) &&
+            r.userId === where.userId,
         );
-        if (index === -1) return { count: 0 };
-        ringtones.splice(index, 1);
+        gone.forEach((r) => ringtones.splice(ringtones.indexOf(r), 1));
         schedules
-          .filter((sched) => sched.ringtoneId === where.id)
+          .filter((sched) => gone.some((r) => r.id === sched.ringtoneId))
           .forEach((sched) => (sched.ringtoneId = null));
-        return { count: 1 };
+        return { count: gone.length };
       },
     },
     ringSchedule: {
