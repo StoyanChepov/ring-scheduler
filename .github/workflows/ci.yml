@@ -1,0 +1,70 @@
+# Checks every pull request (and main after a merge) before Vercel deploys it.
+# apps/api and apps/web are separate pnpm projects, each with its own
+# lockfile, so each job installs inside its own directory.
+#
+# The Android app is not built here: its google-services.json is git-ignored.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (lint, unit and HTTP tests, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/api/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/api/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      # Without --fix (unlike `pnpm lint`), so problems fail the job.
+      - run: pnpm exec eslint "{src,apps,libs,test}/**/*.ts"
+
+      # The tests use an in-memory database; no Postgres or Firebase needed.
+      - run: pnpm test
+      - run: pnpm test:e2e
+
+      - run: pnpm build
+
+  web:
+    name: Web (type check and build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/web/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
