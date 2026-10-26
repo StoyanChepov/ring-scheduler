@@ -39,7 +39,11 @@ jobs:
           java-version: 21
           cache: gradle
 
+      # Its default package list includes 'tools', which newer sdkmanager
+      # versions no longer have, so name the packages the build needs.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0
 
       - name: Restore signing key and Firebase config
         env:
