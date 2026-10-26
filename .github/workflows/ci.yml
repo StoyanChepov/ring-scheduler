@@ -3,6 +3,7 @@
 # lockfile, so each job installs inside its own directory.
 #
 # The Android app is not built here: its google-services.json is git-ignored.
+# android-release.yml builds it from secrets when a v* tag is pushed.
 name: CI
 
 on:

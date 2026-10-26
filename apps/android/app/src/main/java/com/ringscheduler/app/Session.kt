@@ -6,8 +6,10 @@ import android.content.Context
 class Session(context: Context) {
     private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
 
+    // Only debug builds can point the app elsewhere (the PC, through adb
+    // reverse); release builds ignore a URL saved by an older version.
     var serverUrl: String
-        get() = prefs.getString("serverUrl", null) ?: DEFAULT_SERVER_URL
+        get() = prefs.getString("serverUrl", null)?.takeIf { BuildConfig.DEBUG } ?: DEFAULT_SERVER_URL
         set(value) = prefs.edit().putString("serverUrl", value.trimEnd('/')).apply()
 
     var email: String?

@@ -16,6 +16,17 @@ val keystoreProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+// The release workflow passes -PappVersion=1.2.0 from the v1.2.0 tag; local
+// builds use the fallback. versionCode must grow with every release that
+// installs over the last one: 1.2.0 -> 10200.
+val appVersion = providers.gradleProperty("appVersion").getOrElse("1.0.1")
+require(Regex("""\d{1,2}\.\d{1,2}\.\d{1,2}""").matches(appVersion)) {
+    "appVersion must look like 1.2.0 (each part below 100), got '$appVersion'"
+}
+val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
+    major * 10000 + minor * 100 + patch
+}
+
 android {
     namespace = "com.ringscheduler.app"
     compileSdk = 37
@@ -24,11 +35,13 @@ android {
         applicationId = "com.ringscheduler.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.1"
+        versionCode = appVersionCode
+        versionName = appVersion
 
-        // What the login screen suggests; the user can still change it.
+        // The API the app talks to. Only debug builds let the login screen change it.
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://ring-scheduler.vercel.app\"")
+        // Where alarms are managed; opened from the home screen.
+        buildConfigField("String", "WEB_URL", "\"https://ring-scheduler-web.vercel.app\"")
     }
 
     buildFeatures {
@@ -70,4 +83,5 @@ base {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:35.0.2"))
     implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.android.material:material:1.14.0")
 }

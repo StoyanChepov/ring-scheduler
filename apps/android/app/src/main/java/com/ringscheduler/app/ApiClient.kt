@@ -1,11 +1,20 @@
 package com.ringscheduler.app
 
+import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
 class ApiException(val status: Int, message: String) : Exception(message)
+
+/** A failed call, in words for the user. */
+fun describeError(context: Context, e: Exception): String = when (e) {
+    is ApiException -> e.message ?: "HTTP ${e.status}"
+    is java.net.ConnectException, is java.net.UnknownHostException, is java.net.SocketTimeoutException ->
+        context.getString(R.string.error_offline)
+    else -> e.message ?: e.javaClass.simpleName
+}
 
 /**
  * Blocking calls to the ring-scheduler API. Call from a background thread.

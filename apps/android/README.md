@@ -28,26 +28,56 @@ one. The user's one-hour login token is never stored on the phone.
 
 ## Release build (for sharing)
 
-Release builds default to the deployed API (`https://ring-scheduler.vercel.app`)
-and only allow HTTPS. They are signed with the key in `keystore/`, whose
-passwords are in `keystore.properties`; both are git-ignored. **Back them up**:
-an installed app can only be updated by an APK signed with the same key.
+Release builds always use the deployed API (`https://ring-scheduler.vercel.app`),
+only allow HTTPS and have no server field on the login screen. They are
+signed with the key in `keystore/`, whose passwords are in
+`keystore.properties`; both are git-ignored. **Back them up**: an installed
+app can only be updated by an APK signed with the same key.
+
+### Publishing a release
+
+Merge to `main`, then tag the version and push the tag:
 
 ```
-./gradlew assembleRelease
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+The [Android release](../../.github/workflows/android-release.yml) workflow
+builds the signed APK with version `1.2.0` (versionCode `10200`: major ×
+10000 + minor × 100 + patch, so every higher version installs over the last)
+and publishes a GitHub release with it attached as `ring-scheduler.apk`. The
+website's "Get the Android app" button always points at the latest release's
+`ring-scheduler.apk`.
+
+One-time setup: add these repository secrets (GitHub → Settings → Secrets and
+variables → Actions). In PowerShell, from `apps/android`, base64 a file with
+`[Convert]::ToBase64String([IO.File]::ReadAllBytes("keystore\ring-scheduler-release.jks"))`.
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `keystore/ring-scheduler-release.jks`, base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | `storePassword` from `keystore.properties` |
+| `ANDROID_KEY_ALIAS` | `keyAlias` |
+| `ANDROID_KEY_PASSWORD` | `keyPassword` |
+| `GOOGLE_SERVICES_JSON_BASE64` | `app/google-services.json`, base64 |
+
+### Building one locally
+
+```
+./gradlew assembleRelease -PappVersion=1.2.0
 # -> app/build/outputs/apk/release/ring-scheduler-release.apk
 ```
 
-To publish, create a GitHub release and attach the APK renamed to
-`ring-scheduler.apk`; the website's "Get the Android app" button always
-points at the latest release's `ring-scheduler.apk`.
+Without `-PappVersion` the build is version `1.0.1`.
 
 A phone that has the debug build must uninstall it before installing the
 release build (different signing keys).
 
 ## Reaching the local API
 
-The app's default server URL is `http://localhost:3000`. Forward it to the PC:
+Debug builds show a "Server" field on the login screen, filled with
+`http://localhost:3000`. Forward that port to the PC:
 
 ```
 adb reverse tcp:3000 tcp:3000
@@ -58,7 +88,7 @@ do not.
 
 ## Testing push without the dashboard
 
-Copy the token from the app ("Copy push token", or `FCM token:` in Logcat) and
+Copy the token from the app (⋮ menu → "Copy push token", or `FCM token:` in Logcat) and
 from `apps/api` run:
 
 ```
@@ -76,8 +106,11 @@ adb connect <ip>:<port shown on the Wireless debugging screen>
 
 ## Known limitations
 
-- If Android 14+ switches off full-screen alerts for the app, the main screen
-  shows "Allow alarm screen"; without it a locked phone rings with the screen off.
+- If Android 14+ switches off full-screen alerts for the app, the home screen
+  shows an "Alarm screen is off" card; without it a locked phone rings with the
+  screen off.
+- Alarms are read-only on the phone: they are added and edited in the web app,
+  which the home screen links to.
 - Uses `FirebaseMessaging.getToken()`/`onNewToken()`, deprecated in
   firebase-messaging 26. The replacement (`register()`/`onRegistered()`) is
   opt-in behind a manifest flag that changes the registration scheme, so the
