@@ -1,4 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The web app's palette (apps/web/src/style.css). Dark mode: values-night. -->
 <resources>
     <color name="ic_launcher_background">#FF172033</color>
+
+    <color name="primary">#FF172033</color>
+    <color name="on_primary">#FFFFFFFF</color>
+    <color name="primary_container">#FFE8EDF6</color>
+    <color name="on_primary_container">#FF172033</color>
+
+    <color name="background">#FFF5F7FB</color>
+    <color name="surface">#FFF5F7FB</color>
+    <color name="card">#FFFFFFFF</color>
+    <color name="on_surface">#FF172033</color>
+    <color name="on_surface_variant">#FF5B677C</color>
+    <color name="outline">#FFCFD7E6</color>
+    <color name="outline_variant">#FFE1E6EF</color>
+
+    <color name="error">#FFB42318</color>
+    <color name="on_error">#FFFFFFFF</color>
+    <color name="error_container">#FFFDECEB</color>
+    <color name="on_error_container">#FF7A1A12</color>
+    <color name="error_border">#FFF3C5C1</color>
 </resources>

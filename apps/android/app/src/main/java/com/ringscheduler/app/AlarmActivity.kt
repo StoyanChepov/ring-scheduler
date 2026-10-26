@@ -1,6 +1,5 @@
 package com.ringscheduler.app
 
-import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -9,13 +8,15 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 
 /**
  * Shown over the lock screen while ringing, so a phone that rings with its
  * screen off lights up with a way to stop it. Opened by the ringing
  * notification's full-screen intent.
  */
-class AlarmActivity : Activity() {
+class AlarmActivity : AppCompatActivity() {
 
     private val stoppedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = finish()
@@ -44,11 +45,7 @@ class AlarmActivity : Activity() {
 
         // Close when ringing ends some other way: timeout, RING_STOP, notification.
         val filter = IntentFilter(RingService.ACTION_RINGING_STOPPED)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(stoppedReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(stoppedReceiver, filter)
-        }
+        ContextCompat.registerReceiver(this, stoppedReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     override fun onResume() {

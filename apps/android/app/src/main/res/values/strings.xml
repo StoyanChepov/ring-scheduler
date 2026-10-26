@@ -5,4 +5,78 @@
     <string name="ring_notification_title">Ringing</string>
     <string name="ring_notification_text">Started from Ring Scheduler</string>
     <string name="stop">Stop</string>
+
+    <!-- Login -->
+    <string name="login_subtitle">Sign in to connect this phone to your alarms.</string>
+    <string name="log_in">Log in</string>
+    <string name="create_account">Create account</string>
+    <string name="server_debug">Server (debug build)</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm password</string>
+    <string name="password_rule">At least 8 characters</string>
+    <string name="error_email_required">Enter your email</string>
+    <string name="error_email_invalid">Enter a valid email address</string>
+    <string name="error_password_required">Enter your password</string>
+    <string name="error_password_short">Use at least 8 characters</string>
+    <string name="error_password_mismatch">Passwords don\'t match</string>
+    <string name="error_server_required">Enter the server address</string>
+    <string name="error_offline">Can\'t reach the server. Check your internet connection.</string>
+    <string name="logged_out">You\'re logged out.</string>
+    <string name="disconnected">This phone was disconnected from your account. Log in to connect it again.</string>
+
+    <!-- Home -->
+    <string name="sync_now">Sync now</string>
+    <string name="copy_push_token">Copy push token</string>
+    <string name="push_token_copied">Push token copied</string>
+    <string name="push_token_not_ready">Push token isn\'t ready yet</string>
+    <string name="log_out">Log out</string>
+    <string name="log_out_title">Log out?</string>
+    <string name="log_out_message">This phone stops ringing for your alarms until you log in again.</string>
+    <string name="cancel">Cancel</string>
+    <string name="synced">Alarms are up to date</string>
+    <string name="sync_failed">Couldn\'t refresh alarms: %1$s</string>
+
+    <string name="warning_exact_title">Alarms are blocked</string>
+    <string name="warning_exact_text">Allow \"Alarms &amp; reminders\" so scheduled alarms can ring on time.</string>
+    <string name="warning_screen_title">Alarm screen is off</string>
+    <string name="warning_screen_text">Without it, a locked phone rings with its screen off and no Stop button.</string>
+    <string name="warning_notifications_title">Notifications are off</string>
+    <string name="warning_notifications_text">The ringing notification is how you stop an alarm from the lock screen.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="allow">Allow</string>
+
+    <string name="ringing_now">Ringing now</string>
+    <string name="stop_ringing">Stop ringing</string>
+
+    <string name="next_alarm">Next alarm</string>
+    <string name="no_alarms_title">No alarms scheduled</string>
+    <string name="no_alarms_text">Alarms you add on the web show up here.</string>
+    <string name="your_alarms">Your alarms</string>
+    <string name="managed_on_web">Alarms are added and edited in the web app.</string>
+    <string name="open_web_app">Open web app</string>
+
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="every_day">Every day</string>
+    <string name="weekdays">Weekdays</string>
+    <string name="weekends">Weekends</string>
+    <string name="no_days">No days selected</string>
+    <string name="once">Once · %1$s</string>
+    <string name="once_passed">Once · already rang</string>
+    <string name="untitled_alarm">Alarm</string>
+    <string name="rings_for">rings %1$s</string>
+    <string name="seconds_short">%1$d s</string>
+    <string name="minutes_short">%1$d min</string>
+    <string name="minutes_seconds_short">%1$d min %2$d s</string>
+    <string name="in_less_than_a_minute">in less than a minute</string>
+    <string name="in_minutes">in %1$d min</string>
+    <string name="in_hours_minutes">in %1$d h %2$d min</string>
+    <string name="in_days_hours">in %1$d d %2$d h</string>
+    <string name="separator">%1$s · %2$s</string>
+
+    <string name="synced_just_now">Synced just now</string>
+    <string name="synced_ago">Synced %1$s</string>
+    <string name="never_synced">Not synced yet</string>
+    <string name="version">Version %1$s</string>
 </resources>

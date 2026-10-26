@@ -20,6 +20,10 @@ object AlarmScheduler {
     private const val PREFS = "schedules"
     private const val KEY_SCHEDULES = "schedules"
     private const val KEY_ARMED_IDS = "armedIds"
+    private const val KEY_LAST_SYNCED_AT = "lastSyncedAt"
+
+    /** Sent (to this app only) after the cached schedules change. */
+    const val ACTION_SCHEDULES_UPDATED = "com.ringscheduler.app.SCHEDULES_UPDATED"
 
     /** Downloads the schedules and re-sets every alarm. Blocking: call off the main thread. */
     fun sync(context: Context): List<Schedule> {
@@ -40,10 +44,12 @@ object AlarmScheduler {
         }
         prefs(context).edit()
             .putString(KEY_SCHEDULES, Schedule.listToJson(schedules).toString())
+            .putLong(KEY_LAST_SYNCED_AT, System.currentTimeMillis())
             .apply()
 
         Log.i(TAG, "Synced ${schedules.size} schedule(s)")
         rescheduleAll(context)
+        notifyUpdated(context)
 
         // After the alarms are set, so a slow download can't delay them. An
         // alarm whose ringtone isn't cached plays the default sound instead.
@@ -53,8 +59,18 @@ object AlarmScheduler {
 
     /** Forgets the schedules and cancels every alarm (on logout). */
     fun clear(context: Context) {
-        prefs(context).edit().remove(KEY_SCHEDULES).apply()
+        prefs(context).edit().remove(KEY_SCHEDULES).remove(KEY_LAST_SYNCED_AT).apply()
         rescheduleAll(context)
+        notifyUpdated(context)
+    }
+
+    /** When the schedules were last downloaded, or null if never. */
+    fun lastSyncedAt(context: Context): Instant? =
+        prefs(context).getLong(KEY_LAST_SYNCED_AT, 0L).takeIf { it > 0 }?.let(Instant::ofEpochMilli)
+
+    // Lets an open home screen redraw when a push changes the alarms.
+    private fun notifyUpdated(context: Context) {
+        context.sendBroadcast(Intent(ACTION_SCHEDULES_UPDATED).setPackage(context.packageName))
     }
 
     fun cachedSchedules(context: Context): List<Schedule> {

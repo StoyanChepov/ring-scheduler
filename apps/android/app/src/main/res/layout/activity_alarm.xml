@@ -1,41 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF1A237E"
     android:gravity="center"
     android:orientation="vertical"
     android:padding="32dp">
 
-    <ImageView
-        android:layout_width="96dp"
-        android:layout_height="96dp"
-        android:contentDescription="@null"
-        android:src="@drawable/ic_ring"
-        android:tint="#FFFFFFFF" />
-
-    <TextView
+    <!-- Follows the phone's 12/24-hour setting and keeps itself up to date. -->
+    <TextClock
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/ring_notification_title"
-        android:textColor="#FFFFFFFF"
-        android:textSize="40sp"
-        android:textStyle="bold" />
+        android:format12Hour="h:mm"
+        android:format24Hour="HH:mm"
+        android:textAppearance="?attr/textAppearanceDisplayLarge"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="88sp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_ring"
+            app:tint="?attr/colorOnSurface" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/ring_notification_title"
+            android:textAppearance="?attr/textAppearanceHeadlineMedium"
+            android:textColor="?attr/colorOnSurface" />
+    </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="@string/ring_notification_text"
-        android:textColor="#CCFFFFFF"
-        android:textSize="16sp" />
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
     <Button
         android:id="@+id/stopButton"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
-        android:layout_marginTop="64dp"
+        android:layout_height="80dp"
+        android:layout_marginTop="72dp"
         android:text="@string/stop"
-        android:textSize="22sp" />
+        android:textSize="24sp"
+        app:cornerRadius="40dp" />
 </LinearLayout>

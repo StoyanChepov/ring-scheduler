@@ -120,6 +120,7 @@ class RingService : Service() {
 
     private fun markRinging() {
         isRinging = true
+        sendBroadcast(Intent(ACTION_RINGING_STARTED).setPackage(packageName))
         Log.i(TAG, "Ringing started")
     }
 
@@ -219,6 +220,9 @@ class RingService : Service() {
 
         /** Sent (to this app only) whenever ringing ends, so AlarmActivity can close. */
         const val ACTION_RINGING_STOPPED = "com.ringscheduler.app.RINGING_STOPPED"
+
+        /** Sent (to this app only) when ringing starts, so the home screen can offer Stop. */
+        const val ACTION_RINGING_STARTED = "com.ringscheduler.app.RINGING_STARTED"
 
         @Volatile
         var isRinging = false
